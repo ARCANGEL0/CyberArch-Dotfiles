@@ -11,7 +11,7 @@ import { SCREEN_WIDTH, SCREEN_HEIGHT } from "../../env.ts"
 import { TITLE, MONO } from "./fonts.ts"
 const Cairo: any = (imports as any).cairo
 const cR = f(NEON.red), cC = f(NEON.cyan)
-// control variables
+
 const PW = 560, PH = 648, CSZ = 186
 let pWin: any = null, pArea: any = null
 let visible = false
@@ -33,7 +33,7 @@ const fmt = (us) => { const s = Math.max(0, Math.floor((us || 0) / 1e6)); return
 const freqOf = (i) => (89.3 + i * 2.4 + (i % 2) * 0.5 + (i % 3) * 0.3).toFixed(1)
 
 
-// gets thumbnail of song using curl
+
 const loadCover = (url) => {
  if (url === coverUrl) return
  coverUrl = url; coverPb = null; coverScaled = null
@@ -167,7 +167,7 @@ const keyChip = (ctx, x, yc, key, label, boxCol, labelCol, a) => {
 
 const renderPanel = (ctx) => {
  const X = 0, Y = 0
-// here it begins drawing the radioport as maximum as possible similar to the music player of the game
+
  txt(ctx, X + 14, Y + 14, "TRN_TCLAS_B00095", MONO, 9, cR, 0.55, 1)
 
  const tby = Y + 22, tbh = 50, tx0 = X + 14
@@ -249,13 +249,13 @@ const renderPanel = (ctx) => {
  lg.forEach((s, i) => txt(ctx, X + 6, PH - 24 + i * 8, s, MONO, 7, cR, 0.5, 1))
   const chips = [
   ["↑", "PREVIOUS SOURCE", null],
-  ["↓", "NEXT SOURCE", null], 
-  ["SPACE", "PLAY/STOP TRACK", "play-pause"], 
-  ["←", "PREVIOUS TRACK", "previous"], 
-  ["→", "NEXT TRACK", "next"], 
+  ["↓", "NEXT SOURCE", null],
+  ["SPACE", "PLAY/STOP TRACK", "play-pause"],
+  ["←", "PREVIOUS TRACK", "previous"],
+  ["→", "NEXT TRACK", "next"],
   ["ESC", "CLOSE RADIOPORT", "close"]]
 
-  
+
   const row1 = chips.slice(0, 3), row2 = chips.slice(3)
   const cw1 = row1.map(([k, l]) => Math.max(14, measure(ctx, k, MONO, 9, 1) + 9) + 6 + measure(ctx, l, TITLE, 9, 1))
   const cw2 = row2.map(([k, l]) => Math.max(14, measure(ctx, k, MONO, 9, 1) + 9) + 6 + measure(ctx, l, TITLE, 9, 1))
@@ -338,11 +338,14 @@ export const togglePlayer = () => {
      visible = true; introTarget = 1
      try { pWin.gdkmonitor = activeMonitor() } catch {}
      pWin.visible = true; try { pWin.present?.() } catch {}
-     poll(); startTimers()
+     poll(); startTimers(); pFire()
  } else closePlayer()
  pArea && pArea.queue_draw()
 }
-export const closePlayer = () => { if (!visible && introTarget === 0) return; visible = false; introTarget = 0; startTimers() }
+const pCbs: any[] = []
+export const onPlayerChange = (cb) => { pCbs.push(cb) }
+const pFire = () => { for (const cb of pCbs) cb() }
+export const closePlayer = () => { if (!visible && introTarget === 0) return; visible = false; introTarget = 0; startTimers(); pFire() }
 export const isPlayerOpen = () => visible
 export const playPauseActive = () => execAsync(["sh", "-c", pctl(activeName, "play-pause")]).catch(() => {})
 

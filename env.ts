@@ -3,7 +3,7 @@ import GdkPixbuf from "gi://GdkPixbuf"
 import Gtk from "gi://Gtk?version=3.0"
 import Gdk from "gi://Gdk?version=3.0"
 
-// ── Paths ───────────────────────────────────────────────────────────────
+
 export const HOME = GLib.get_home_dir()
 export const CYBER_DIR = `${HOME}/.config/hypr/themes/cyberpunk`
 export const COMPONENTS_DIR = `${CYBER_DIR}/components`

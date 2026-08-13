@@ -34,7 +34,7 @@ export const LauncherWindow = (mon?) => {
      fillQuad(ctx, prompt, chX, chY, chX + chW, chY + chH, NEON.cyan, hover ? 0.18 : 0.10)
      ctx.setOperator(12); strokePath(ctx, prompt, boxPts, NEON.cyan, hover ? 0.34 : 0.2, 5, true); ctx.setOperator(2)
      strokePath(ctx, prompt, boxPts, NEON.cyan, hover ? 1 : 0.85, 1.5, true)
-     tiltText(ctx, prompt, chX + chW / 2, chY + chH / 2 + 4, "SUPER", TITLE, 11, NEON.cyan, hover ? 1 : 0.9, { bold: true, align: "c", glow: 0.3 })
+     tiltText(ctx, prompt, chX + chW / 2, chY + chH / 2 + 4, "SUPER TAB", TITLE, 8, NEON.cyan, hover ? 1 : 0.9, { bold: true, align: "c", glow: 0.3 })
 
      if (ICON) {
          const iconW = 160, iconH = 100, ix = W - iconW , iy = 76
@@ -53,17 +53,23 @@ export const LauncherWindow = (mon?) => {
      return false
  })
 
- interval(110, () => {
-     if (!hover) { if (flick !== 1) { flick = 1; area.queue_draw() } return }
+ let flickT: any = null
+ const flip = () => {
+     if (!hover) {
+         if (flick !== 1) { flick = 1; area.queue_draw() }
+         if (flickT) { flickT.cancel(); flickT = null }
+         return
+     }
      flick = Math.random() < 0.12 ? 0.4 + Math.random() * 0.35 : 0.9 + Math.random() * 0.1
      area.queue_draw()
- })
+     if (!flickT) flickT = interval(110, flip)
+ }
 
  const evt = EventBox({ child: area })
  try { evt.add_events(Gdk.EventMask.BUTTON_PRESS_MASK | Gdk.EventMask.ENTER_NOTIFY_MASK | Gdk.EventMask.LEAVE_NOTIFY_MASK) } catch {}
  evt.connect("button-press-event", () => { try { openAppsMenu() } catch (e) { print(e) } return false })
- evt.connect("enter-notify-event", () => { hover = true; area.queue_draw(); return false })
- evt.connect("leave-notify-event", () => { hover = false; area.queue_draw(); return false })
+ evt.connect("enter-notify-event", () => { hover = true; area.queue_draw(); flip(); return false })
+ evt.connect("leave-notify-event", () => { hover = false; area.queue_draw(); flip(); return false })
 
  return Window({
      name: "launcher", className: "aug launcher", gdkmonitor: mon, anchor: Anchor.BOTTOM | Anchor.RIGHT,

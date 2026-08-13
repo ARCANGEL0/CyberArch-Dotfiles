@@ -1,14 +1,14 @@
-// the top-left system meters -- CPU / RAM / STORAGE / BATTERY drawn to look like the player
-// status overlay (health/stamina bars) from Cyberpunk 2077's HUD. the look is ported from a
-// react mockup i found of that HUD ("cyberpunk-hud-react"), tuned by eye against a real
-// it tries to mimick at full V's stats bars
-// HEALTH BAR -> CPU monitor
-// RAM Bar -> RAM monitor aswell lol
-// EXPERIENCE -> Storage monitor 
-// STAMINA -> battery percentage 
-// .
+
+
+
+
+
+
+
+
+
 import { Box, DrawingArea, EventBox } from "../../widget.ts"
-import { interval } from "astal"
+import { interval, Variable } from "astal"
 import { buildStats } from "./sys.ts"
 import { makePlane, fillQuad, tiltText } from "./proj.ts"
 import { RGB, f } from "./colors.ts"
@@ -21,24 +21,24 @@ const stats = buildStats()
 const get = (k: string) => stats.find(s => s.key === k)
 const cpu = get("cpu")!, ram = get("ram")!
 
-// the exact colours lifted from the game hud, using colorpicker
+
 const GRAY: RGB = [200, 200, 200] as any
 const LIGHTRED: RGB = [252, 113, 115] as any
 const DARKRED: RGB = [120, 36, 40] as any
 const CYAN: RGB = [85, 222, 255] as any
-// battery colour shifts with charge: red when nearly dead -> orange -> amber -> green when healthy
+
 const batColor = (p: number): RGB => p < 10 ? [255, 55, 55] as any : p < 50 ? [255, 120, 45] as any : p < 70 ? [255, 205, 55] as any : [80, 240, 150] as any
 
 const read = (p: string) => { try { const [ok, d] = GLib.file_get_contents(p); return ok ? new TextDecoder().decode(d) : "" } catch { return "" } }
-// find the battery in /sys/class/power_supply and checks if AC powered or normal lithium battery like laptop. if there's
-// none, readBat() just returns 1 (full) so the rail sits full instead of looking broken.
+
+
 const batDir = ((): string | null => {
     try { const d = GLib.Dir.open("/sys/class/power_supply", 0); let n: string | null
         while ((n = d.read_name())) { const p = `/sys/class/power_supply/${n}`; if (read(`${p}/type`).trim() === "Battery") return p } } catch {}
     return null
 })()
 const readBat = () => batDir ? (parseInt(read(`${batDir}/capacity`).trim()) || 0) / 100 : 1
-// disk usage of the root filesystem (/), via gio so i don't have to parse `df`. which polls slow af
+
 let diskFrac = 0, diskUsedG = 0, diskTotG = 0
 const readDisk = () => { try {
     const i = Gio.File.new_for_path("/").query_filesystem_info("filesystem::size,filesystem::used", null)
@@ -46,7 +46,8 @@ const readDisk = () => { try {
     diskTotG = Math.round(sz / 1e9); diskUsedG = Math.round(us / 1e9); diskFrac = sz > 0 ? us / sz : 0
 } catch {} }
 readDisk(); let batteryV = readBat()
-interval(8000, () => { readDisk(); batteryV = readBat() })
+const poke = Variable(0)
+interval(8000, () => { readDisk(); batteryV = readBat(); poke.set(poke.get() + 1) })
 
 const readTemp = (): number => {
     for (const z of ["thermal_zone0", "thermal_zone1", "thermal_zone2", "thermal_zone3"]) {
@@ -89,7 +90,7 @@ const bloom = (ctx: any, x0: number, y0: number, x1: number, y1: number, col: RG
 const glowShape = (ctx: any, pts: [number, number][], col: RGB, blur: number, k: number) => glowPath(ctx, pts, col, blur, k)
 
 const holoFill = (ctx: any, x0: number, x1: number, y: number, h: number, base: RGB, a: number) => {
-    fillQuad(ctx, plane, x0, y, x1, y + h, base, a)   // intentionally flat & matte -- no gloss, that's what keeps it holographic not glassy
+    fillQuad(ctx, plane, x0, y, x1, y + h, base, a)
 }
 
 const scanlines = (ctx: any, x0: number, x1: number, y: number, h: number, gap: number) => {
@@ -114,17 +115,17 @@ export const Monitors = () => {
         const [bx_l, bx_t] = plane.project(18, 14)
         const [bx_r, bx_b] = plane.project(62, 54)
 
-        // the y-boundaries between adjacent meters, sitting halfway between each row's top edge
-        const mid1 = (sto_t + cpu_t) / 2   // storage|cpu boundary (~44.6)
-        const mid2 = (cpu_t + ram_t) / 2   // cpu|ram boundary (~59.0)
-        const mid3 = (ram_t + bat_t) / 2   // ram|battery boundary (~85.2)
 
-        // now just bucket the cursor into whichever zone it falls in
-        if (x >= bx_l - 4 && x <= bx_r + 4 && y >= bx_t - 4 && y <= bx_b + 4) return "badge"  // the badge box, left side
-        if (y >= bat_t - 6 && y <= bat_b + 6 && x >= bat_l - 6 && x <= bat_r + 6) return "bat" // battery rail, down below
-        if (y >= mid1 && y < mid2 && x >= sto_l - 6 && x <= sto_r + 6) return "sto"            // thin storage bar up top
-        if (y >= mid2 && y < mid3 && x >= cpu_l - 6 && x <= cpu_r + 6) return "cpu"            // cpu bar, middle
-        if (y >= mid3 && y < bat_t + 10 && x >= ram_l - 6 && x <= ram_r + 6) return "ram"      // ram ticks, lower
+        const mid1 = (sto_t + cpu_t) / 2
+        const mid2 = (cpu_t + ram_t) / 2
+        const mid3 = (ram_t + bat_t) / 2
+
+
+        if (x >= bx_l - 4 && x <= bx_r + 4 && y >= bx_t - 4 && y <= bx_b + 4) return "badge"
+        if (y >= bat_t - 6 && y <= bat_b + 6 && x >= bat_l - 6 && x <= bat_r + 6) return "bat"
+        if (y >= mid1 && y < mid2 && x >= sto_l - 6 && x <= sto_r + 6) return "sto"
+        if (y >= mid2 && y < mid3 && x >= cpu_l - 6 && x <= cpu_r + 6) return "cpu"
+        if (y >= mid3 && y < bat_t + 10 && x >= ram_l - 6 && x <= ram_r + 6) return "ram"
         return null
     }
     const tooltipLabels: Record<string, string> = {
@@ -173,14 +174,14 @@ export const Monitors = () => {
             const fillPts: [number, number][] = end <= MAIN - ch
                 ? [[X0, y], [end, y], [end, y + h], [X0, y + h]]
                 : [[X0, y], [end, y], [end, y + h / 2 + (h / 2) * (MAIN - end) / ch], [MAIN - ch, y + h], [X0, y + h]]
-            glowShape(ctx, fillPts, LIGHTRED, 8, 1.1)        
-            poly(ctx, fillPts, LIGHTRED, 0.85)                
+            glowShape(ctx, fillPts, LIGHTRED, 8, 1.1)
+            poly(ctx, fillPts, LIGHTRED, 0.85)
             scanlines(ctx, X0, end, y, h, 2.8)
         }
         {
             const y = 44, h = 18, tw = 8, gap = 1.6
-            const n = Math.max(1, Math.floor((RAMX - X0 + gap) / (tw + gap)))   // how many ticks fit
-            const lit = Math.round(clamp(d.ram) * n)                            // how many are lit
+            const n = Math.max(1, Math.floor((RAMX - X0 + gap) / (tw + gap)))
+            const lit = Math.round(clamp(d.ram) * n)
             const RAMP: [number, number][] = [[11.29, 0], [18, 0], [18, 52.09], [11.29, 60], [4.58, 60], [4.58, 30], [0, 30], [0, 0]]
             for (let i = 0; i < n; i++) {
                 const sx = X0 + i * (tw + gap)
@@ -224,12 +225,12 @@ export const Monitors = () => {
                 if (ty < 0) ty = my + 20
 
                 const shape: [number, number][] = [
-                    [tx + notch, ty],           // top-left chamfer start
-                    [tx + tw, ty],              // top-right corner
-                    [tx + tw, ty + th - notch],  // right side down to chamfer
-                    [tx + tw - notch, ty + th],  // bottom-right chamfer
-                    [tx, ty + th],              // bottom-left corner
-                    [tx, ty + notch],           // left side up to chamfer
+                    [tx + notch, ty],
+                    [tx + tw, ty],
+                    [tx + tw, ty + th - notch],
+                    [tx + tw - notch, ty + th],
+                    [tx, ty + th],
+                    [tx, ty + notch],
                 ]
 
                 ctx.newPath()
@@ -250,8 +251,8 @@ export const Monitors = () => {
                     ctx.setLineWidth(0.5); ctx.stroke()
                 }
 
-                // outer red glow around the tooltip (same stacked-stroke trick as glowPath)
-                ctx.setOperator(12) // additive blend
+
+                ctx.setOperator(12)
                 for (const [w, a] of [[6, 0.06], [4, 0.10], [2.5, 0.16]] as const) {
                     ctx.newPath()
                     shape.forEach(([sx, sy], i) => i ? ctx.lineTo(sx, sy) : ctx.moveTo(sx, sy))
@@ -260,9 +261,9 @@ export const Monitors = () => {
                     ctx.setLineWidth(w)
                     ctx.stroke()
                 }
-                ctx.setOperator(2) // back to normal blend
+                ctx.setOperator(2)
 
-                // the crisp red outline
+
                 ctx.newPath()
                 shape.forEach(([sx, sy], i) => i ? ctx.lineTo(sx, sy) : ctx.moveTo(sx, sy))
                 ctx.closePath()
@@ -270,13 +271,13 @@ export const Monitors = () => {
                 ctx.setLineWidth(1.3)
                 ctx.stroke()
 
-                // brighten just the two chamfered cut edges so the cut corners pop
+
                 ctx.setSourceRGBA(1, 200/255, 200/255, 1)
                 ctx.setLineWidth(1.5)
                 ctx.newPath(); ctx.moveTo(tx, ty + notch); ctx.lineTo(tx + notch, ty); ctx.stroke()
                 ctx.newPath(); ctx.moveTo(tx + tw - notch, ty + th); ctx.lineTo(tx + tw, ty + th - notch); ctx.stroke()
 
-                // the label text itself
+
                 const baseline = ty + pad + te.height + (te.y < 0 ? te.y : 0)
                 ctx.setSourceRGBA(1, 180/255, 180/255, 1)
                 ctx.moveTo(tx + pad, baseline)
@@ -288,21 +289,24 @@ export const Monitors = () => {
         return false
     })
     const tgt = () => ({ sto: diskFrac, cpu: clamp(cpu.frac.get()), ram: clamp(ram.frac.get()), bat: batteryV })
-    let last = "", lastDraw = 0
-    const t = interval(110, () => {
+    let last = "", lastDraw = 0, t: any = null
+    const pump = () => {
         let busy = false, changed = false
         const g = tgt()
         for (const k of ["sto", "cpu", "ram", "bat"] as const) {
             const di = g[k] - (d as any)[k]
-            if (Math.abs(di) > 0.04) { (d as any)[k] += di * 0.22; busy = true }  // far away -> ease toward it
-            else if (di !== 0) (d as any)[k] = g[k]                               // close enough -> just snap and stop
+            if (Math.abs(di) > 0.04) { (d as any)[k] += di * 0.22; busy = true }
+            else if (di !== 0) (d as any)[k] = g[k]
         }
         const sig = `${cpu.percent.get()}|${ram.substat.get()}|${diskUsedG}|${Math.round(batteryV * 100)}`
         if (sig !== last) { last = sig; changed = true }
         const now = Date.now()
         if (busy || (changed && now - lastDraw > 320)) { lastDraw = now; area.queue_draw() }
-    })
-    area.connect("destroy", () => t.cancel())
+        if (busy && !t) t = interval(110, pump)
+        else if (!busy && t) { t.cancel(); t = null }
+    }
+    cpu.frac.subscribe(pump); ram.frac.subscribe(pump); poke.subscribe(pump)
+    area.connect("destroy", () => { if (t) t.cancel() })
     return Box({ className: "monitors", children: [evt] })
 }
 const lighten = (c: RGB, t: number): RGB => [c[0] + (255 - c[0]) * t, c[1] + (255 - c[1]) * t, c[2] + (255 - c[2]) * t] as any

@@ -1,15 +1,4 @@
 #!/usr/bin/env bash
-# M a d e  b y:
-# ╔═════════════════════════════════════════════════════════════════════════╗
-# ║   ██████    ████████      ████████  ██      ██  ██            ██████    ║
-# ║ ██ ░░░░░██  ██░░░░░░██  ██ ░░░░░░░░  ░██  ██ ░░ ██░         ██ ░░░░░██  ║
-# ║ ██████████░ ████████ ░░ ██░            ░██ ░░   ██░         ██░     ██░ ║
-# ║ ██░░░░░░██░ ██░░░░██░   ██░           ██ ░██    ██░         ██░     ██░ ║
-# ║ ██░     ██░ ██░    ░██   ░████████  ██ ░░  ░██  ██████████   ░██████ ░░ ║
-# ╚═════════════════════════════════════════════════════════════════════════╝ 
-# ═══════════════════════════════════════════════════════════════════════════════
-#  CYBERPUNK 2077 · NIGHT CITY  |::|  Hyprland netrunner rice · installer
-# ═══════════════════════════════════════════════════════════════════════════════
 set -uo pipefail
 THEME="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 R=$'\033[0m'; B=$'\033[1m'; DIM=$'\033[2m'
@@ -30,7 +19,6 @@ EOF
   printf "${R}${CYAN}   ░▒▓ NIGHT CITY RICE · Installer ▓▒░${R}\nMade by: @arcxlo\n"
   line
 }
-# ── packages to install  (REPO = pacman · AUR = yay/paru) ──
 REPO=(
   gjs grim wf-recorder wl-clipboard networkmanager bluez-utils curl
   wireplumber playerctl brightnessctl power-profiles-daemon upower
@@ -38,23 +26,21 @@ REPO=(
   base-devel pkgconf cmake cpio gcc lib32-libelf chafa
   pipewire pipewire-audio pipewire-pulse libpulse mpv ffmpeg sox
   ttf-jetbrains-mono ttf-firacode-nerd ttf-nerd-fonts-symbols
-  lib32-gnutls dnsmasq pipewire-alsa ffmpeg4.4 gst-plugin-pipewire lib32-nettle 
+  lib32-gnutls dnsmasq pipewire-alsa ffmpeg4.4 gst-plugin-pipewire lib32-nettle
   openconnect pipewire-jack pipewire-v4l2 pipewire-x11-bell pipewire-zeroconf
 )
 AUR=(
-  # AGS v3 binary + GJS engine which is the main magic for this theme
   aylurs-gtk-shell
   libastal-gjs-git libastal-notifd-git libastal-wireplumber-git libastal-mpris-git
   pamtester
 )
+HYP_PKGS="hyprland hyprgraphics hyprland-guiutils hyprlock hyprtoolkit hyprwire xdg-desktop-portal-hyprland lua lua54 gcc gcc-libs"
 
 clear; banner
 
-# ── 0 · validate pac and hypr things  ─────────────────────────────────────────────────────────────────
 command -v pacman >/dev/null || { err "pacman not found |::| this installer targets Arch Linux."; exit 1; }
 command -v hyprctl >/dev/null || warn "Hyprland not detected on PATH |::| install/run Hyprland for the rice to work."
 
-# full upgrade first avoids partial-upgrade breakage. no = just install the theme deps
 hdr "SYSTEM UPGRADE"
 printf "[!] Run a full system upgrade before installing theme? (y/N) "
 read -r ans </dev/tty
@@ -64,31 +50,32 @@ else
   ok "skipped |::| continuing to the installer."
 fi
 
-# The custom cyberpunk titlebar plugin is built against Hyprland 0.55's  API,
-# so it reqs Hyprland >= 0.55. 
-HYP_MIN="0.55"
-HYP_RUN="$(hyprctl version 2>/dev/null | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1)"
-HYPR_PKGS="hyprland hyprgraphics hyprland-guiutils hyprlang hyprlock hyprtoolkit hyprwire xdg-desktop-portal-hyprland lua lua54 gcc gcc-libs"
-if [ -n "$HYP_RUN" ] && [ "$(printf '%s\n%s\n' "$HYP_MIN" "$HYP_RUN" | sort -V | head -1)" != "$HYP_MIN" ]; then
-  warn "Hyprland $HYP_RUN detected |::| the custom cyberpunk TITLEBARS need Hyprland >= $HYP_MIN."
-  warn "Everything else in the theme installs and runs fine on $HYP_RUN."
-  printf "   ${DIM}command:${R} sudo pacman -S %s\n" "$HYPR_PKGS"
-  printf "[!] Update Hyprland now ($HYP_RUN → $HYP_MIN)? (y/N) "
+hdr "HYPRLAND CORE"
+sudo pacman -Sy >/dev/null 2>&1 || true
+CUR="$(pacman -Q hyprland 2>/dev/null | cut -d' ' -f2)"
+AVAIL="$(pacman -Si hyprland 2>/dev/null | sed -n 's/^Version[[:space:]]*:[[:space:]]*//p')"
+if [ -z "$CUR" ]; then
+  step "install latest Hyprland + lua tooling"
+  if sudo pacman -S --needed $HYP_PKGS; then ok "Hyprland (latest) installed"
+  else warn "Hyprland install failed |::| run: sudo pacman -S $HYP_PKGS"; fi
+elif [ -z "$AVAIL" ] || [ "$AVAIL" != "$CUR" ]; then
+  step "Hyprland is currently $CUR${AVAIL:+ — latest is $AVAIL}"
+  printf "[!] Update Hyprland + lua tooling to the latest version? (y/N) "
   read -r ans </dev/tty
   if [ "$ans" = "y" ] || [ "$ans" = "Y" ]; then
-    if sudo pacman -S --needed $HYPR_PKGS; then
-      HYPR_UPDATED=1
-      ok "Hyprland package updated |::| the RUNNING compositor is still the old binary."
-      ok "The titlebars build at the very END of this install; you'll need to restart Hyprland first."
+    if sudo pacman -S --needed $HYP_PKGS; then
+      VER="$(hyprctl version 2>/dev/null | head -1)"
+      if [ -n "$VER" ]; then ok "Hyprland updated |::| $VER"; else ok "Hyprland updated"; fi
     else
-      warn "Hyprland update failed |::| update manually, then run scripts/build-hyprbars for the titlebars."
+      warn "Hyprland update failed |::| run: sudo pacman -S $HYP_PKGS"
     fi
   else
-    warn "skipped |::| titlebars stay off until you update to >= $HYP_MIN (then run scripts/build-hyprbars)."
+    warn "skipped |::| keeping Hyprland $CUR."
   fi
+else
+  ok "Hyprland $CUR already up to date."
 fi
 
-# ── 1 · dependency scan ────────────────────────────────────────────────────────
 hdr "DEPENDENCY SCAN"
 declare -a miss_repo=() miss_aur=()
 pkg_has() { pacman -Qq "$1" &>/dev/null || pacman -Qg "$1" &>/dev/null; }
@@ -100,8 +87,6 @@ for p in "${AUR[@]}"; do
   if pkg_has "$p"; then printf "  ${GRN}✓${R} %s\n" "$p"
   else printf "  ${RED}✗${R} %-22s ${GREY}→ install (AUR)${R}\n" "$p"; miss_aur+=("$p"); fi
 done
-
-# dedup
 mapfile -t miss_repo < <(printf '%s\n' "${miss_repo[@]}" | awk 'NF' | sort -u)
 mapfile -t miss_aur  < <(printf '%s\n' "${miss_aur[@]}"  | awk 'NF' | sort -u)
 if [ "${1:-}" = "--dry-run" ] || [ -n "${AUG_DRYRUN:-}" ]; then
@@ -110,7 +95,6 @@ if [ "${1:-}" = "--dry-run" ] || [ -n "${AUG_DRYRUN:-}" ]; then
   line; exit 0
 fi
 
-# ── 1.5 · location ───────────────────────────────────────────────────
 CANON="$HOME/.config/hypr/themes/cyberpunk"
 if [ "$THEME" != "$CANON" ]; then
   hdr "THEME LOCATION"
@@ -123,7 +107,6 @@ if [ "$THEME" != "$CANON" ]; then
   fi
 fi
 
-# ── 2 · dependency install ─────────────────────────────────────────────────────
 if [ ${#miss_repo[@]} -gt 0 ] || [ ${#miss_aur[@]} -gt 0 ]; then
   hdr "MISSING PACKAGES"
   if [ ${#miss_repo[@]} -gt 0 ]; then
@@ -141,10 +124,10 @@ if [ ${#miss_repo[@]} -gt 0 ] || [ ${#miss_aur[@]} -gt 0 ]; then
     fi
   fi
   if [ ${#miss_aur[@]} -gt 0 ]; then
-    helper="$(command -v yay || command -v paru || true)"
+    helper="$(command -v paru || command -v yay || true)"
     printf "\n${CYAN}AUR PACKAGES REQUIRED:${R} ${B}%s${R}\n" "${miss_aur[*]}"
     if [ -z "$helper" ]; then
-      warn "no AUR helper (yay/paru) found. Install these manually."
+      warn "no AUR helper (paru/yay) found. Install these manually."
     else
       printf "[!] Install missing AUR deps via %s? (y/N) " "$(basename "$helper")"
       read -r ans </dev/tty
@@ -162,7 +145,7 @@ if [ ${#miss_repo[@]} -gt 0 ] || [ ${#miss_aur[@]} -gt 0 ]; then
 else
   hdr "DEPENDENCY SCAN"; ok "all dependencies already present."
 fi
-# ── 3 · ags path binary (theme.conf expects ~/.local/bin/ags) ────────────────────
+
 hdr "AGS RUNTIME"
 mkdir -p "$HOME/.local/bin"
 if [ ! -x "$HOME/.local/bin/ags" ] && command -v ags >/dev/null 2>&1; then
@@ -179,10 +162,9 @@ if [ -d "$NM/astal" ]; then
   ok "astal imports resolved ($NM/astal → $(readlink "$NM/astal"))"
 else
   err "astal NOT resolved |::| the astal GJS lib (/usr/share/astal/gjs) is missing."
-  err "install it: ${B}$( (command -v yay||command -v paru) >/dev/null && basename "$(command -v yay||command -v paru)" || echo yay ) -S libastal-gjs-git${R}  then re-run install.sh."
+  err "install it: ${B}$( (command -v paru||command -v yay) >/dev/null && basename "$(command -v paru||command -v yay)" || echo paru ) -S libastal-gjs-git${R}  then re-run install.sh."
 fi
 
-# ── 3.5 · UI fonts (Quantico + Rajdhani) ──────────────────────────
 hdr "UI FONTS"
 FONTSRC="$THEME/assets/fonts"
 FONTDST="$HOME/.local/share/fonts/cyberpunk"
@@ -194,12 +176,10 @@ else
   warn "bundled fonts missing at $FONTSRC |::| Quantico/Rajdhani text will fall back to sans-serif."
 fi
 
-# ── 3.6 · pacman install-notification hook ──────────────────────
 hdr "PACMAN HOOK"
 HOOKSRC="$THEME/assets/pacman/cyberpunk-pkg-notify.hook"
 HOOKDST="/etc/pacman.d/hooks/cyberpunk-pkg-notify.hook"
 if [ -f "$HOOKSRC" ]; then
-  # heads-up before sudo prompts so it's clear what it's for
   printf "${CYAN}▸ Installing pacman hook :: sudo password required${R}\n"
   printf "${DIM}  This will toggle the Streetcred reputation animation when installing packages or AUR updates available${R}\n"
   if sed "s|__THEME__|$CANON|g" "$HOOKSRC" | sudo tee "$HOOKDST" >/dev/null; then
@@ -211,7 +191,6 @@ else
   warn "hook template missing at $HOOKSRC"
 fi
 
-# ── quickshell + login ──
 hdr "QUICKSHELL · login"
 QT6="qt6-base qt6-declarative qt6-svg qt6-wayland"
 sudo pacman -S --needed $QT6 || warn "qt6 install failed |::| run: sudo pacman -S $QT6"
@@ -220,7 +199,7 @@ if ! command -v qs >/dev/null 2>&1 || ! qs --version >/dev/null 2>&1; then
   sudo pacman -S --needed quickshell || warn "quickshell repo install failed."
 fi
 if ! qs --version >/dev/null 2>&1; then
-  helper="$(command -v yay || command -v paru || true)"
+  helper="$(command -v paru || command -v yay || true)"
   if [ -n "$helper" ]; then
     step "repo quickshell qt6 mismatch |::| building quickshell-git against local qt6"
     "$helper" -S --needed quickshell-git || warn "quickshell-git build failed."
@@ -232,7 +211,6 @@ else
   err "qs not executable |::| run: sudo pacman -Syu to update qt6, then re-run."
 fi
 
-# ── 3.6 · qslockk) ─────────────────────────────────────
 hdr "LOCKSCREEN · PAM service"
 PAMFILE="/etc/pam.d/qs-lock"
 if [ -f "$PAMFILE" ]; then
@@ -240,7 +218,6 @@ if [ -f "$PAMFILE" ]; then
 else
   step "creating $PAMFILE (auth → system-auth)…"
   if sudo tee "$PAMFILE" >/dev/null <<'PAMEOF'
-# pam configs for login
 auth      include   system-auth
 account   include   system-auth
 password  include   system-auth
@@ -251,7 +228,6 @@ PAMEOF
   fi
 fi
 
-# ── 5 · cool-retro-term configs ──────────────────────────
 hdr "COOL-RETRO-TERM · netrunner profile"
 CRT_BIN="$HOME/.local/bin/cool-retro-term"
 CRT_URL="https://github.com/Swordfish90/cool-retro-term/releases/download/2.0.0-beta2/cool-retro-term-2.0.0-beta2.AppImage"
@@ -291,7 +267,6 @@ else
   warn "skipped (need cool-retro-term + jq + netrunner.json). Import it via the app's Load button if needed."
 fi
 
-# ── cool-retro-term first run + netrunner profile ──
 hdr "COOL-RETRO-TERM · netrunner profile install"
 if [ -x "$CRT_BIN" ] && [ -f "$THEME/scripts/netrunner-terminal" ]; then
   if [ ! -d "$HOME/.local/share/cool-retro-term" ]; then
@@ -304,35 +279,26 @@ if [ -x "$CRT_BIN" ] && [ -f "$THEME/scripts/netrunner-terminal" ]; then
 fi
 
 hdr "DEFAULT SHELL · fish"
-# ──── fish install
-
 printf "[!] Set default shell to fish with custom themes? (y/N) "
 read -r ans </dev/tty
-
 if [ "$ans" = "y" ] || [ "$ans" = "Y" ]; then
-
   if ! sudo pacman -S --needed --noconfirm fish chafa git; then
     echo "ERROR: Package installation failed."
     exit 1
   fi
-
   CFG="$HOME/.config/fish/config.fish"
   mkdir -p "$(dirname "$CFG")"
   touch "$CFG"
-
   if command -v fish >/dev/null 2>&1; then
     rm -rf "$HOME/.local/share/omf" 2>/dev/null
-
     if ! fish -c "type -q omf" 2>/dev/null; then
       echo "Cloning Oh My Fish installer..."
       rm -rf /tmp/omf_installer
       git clone https://github.com/oh-my-fish/oh-my-fish /tmp/omf_installer
-
       echo "Running Oh My Fish installation..."
       fish /tmp/omf_installer/bin/install --noninteractive
       rm -rf /tmp/omf_installer
     fi
-
     echo "Installing dangerous theme..."
     fish -c "omf install dangerous" || true
     fish -c "set -U fish_key_bindings fish_vi_key_bindings" 2>/dev/null || true
@@ -373,32 +339,146 @@ if [ "$ans" = "y" ] || [ "$ans" = "Y" ]; then
   fi
 fi
 
-# ── 6 ·activate the theme ────────────────────
-hdr "HYPRLAND · source the theme"
-HYCONF="$HOME/.config/hypr/hyprland.conf"
-mkdir -p "$(dirname "$HYCONF")"; touch "$HYCONF"
-if grep -q "cyberpunk/theme.conf" "$HYCONF"; then
-  ok "theme already sourced in hyprland.conf"
-else
-  printf "[!] Add the theme source to the TOP of hyprland.conf? (y/N) "
+HYDIR="$HOME/.config/hypr"
+HYLUA="$HYDIR/hyprland.lua"
+mkdir -p "$HYDIR"
+
+hdr "DESKTOP SHELL · takeover check"
+detect_shell() {
+  command -v caelestia >/dev/null 2>&1 && { echo "caelestia"; return 0; }
+  [ -d "$HOME/.config/caelestia" ] && { echo "caelestia"; return 0; }
+  command -v noctalia >/dev/null 2>&1 && { echo "noctalia"; return 0; }
+  [ -d "$HOME/.config/noctalia" ] && { echo "noctalia"; return 0; }
+  if [ -f "$HYLUA" ]; then
+    grep -qi "require([\"']caelestia" "$HYLUA" && { echo "caelestia"; return 0; }
+    grep -qi "require([\"']noctalia"  "$HYLUA" && { echo "noctalia"; return 0; }
+  fi
+  return 1
+}
+SHELL_NAME="$(detect_shell || true)"
+if [ -n "$SHELL_NAME" ]; then
+  printf "${YEL}${B}[!] %s has been detected as your current desktop shell.${R}\n" "$SHELL_NAME"
+  printf "${YEL}${B}    This theme will override hyprland.lua configurations and replace %s.${R}\n" "$SHELL_NAME"
+  printf "[!] Do you wish to continue? (y/N) "
   read -r ans </dev/tty
   if [ "$ans" = "y" ] || [ "$ans" = "Y" ]; then
-    TMP="$(mktemp)"
-    {
-      echo "# ── Cyberpunk 2077 · Night City netrunner theme  ──"
-      echo "\$cyberpunk=$CANON"
-      echo "source=$CANON/theme.conf"
-      echo ""
-      cat "$HYCONF"
-    } > "$TMP" && mv "$TMP" "$HYCONF" && ok "prepended \$cyberpunk + source at the top of hyprland.conf"
+    if [ -f "$HYLUA" ]; then cp -f "$HYLUA" "$HYLUA.bak" && ok "backed up $HYLUA → $HYLUA.bak"; fi
+    printf 'package.path = os.getenv("HOME") .. "/.config/hypr/themes/cyberpunk/?.lua;" .. (package.path or "")\nrequire("theme")\n' > "$HYLUA"
+    ok "hyprland.lua now loads the cyberpunk theme in place of $SHELL_NAME"
   else
-    warn "add these two lines to the TOP of hyprland.conf yourself:"
-    printf "    ${B}\$cyberpunk=%s${R}\n    ${B}source=%s/theme.conf${R}\n" "$CANON" "$CANON"
+    warn "aborted |::| no files were changed. Nothing was replaced."
+    exit 0
+  fi
+else
+  ok "no other desktop shell detected."
+fi
+
+hdr "HYPRLAND · load the theme"
+if [ ! -f "$HYLUA" ] && [ -f "$HYDIR/hyprland.conf" ]; then
+  warn "hyprland.conf exists but hyprland.lua takes precedence — once the .lua exists, the .conf is ignored."
+  warn "Migrate your old .conf settings into the .lua (or keep them; the theme ships in the .lua)."
+fi
+WRAPLUA='package.path = os.getenv("HOME") .. "/.config/hypr/themes/cyberpunk/?.lua;" .. (package.path or "")
+require("theme")
+'
+if [ -f "$HYLUA" ] && grep -q 'themes/cyberpunk/theme.lua' "$HYLUA"; then
+  ok "theme already loads from $HYLUA"
+else
+  [ -f "$HYLUA" ] && cp -f "$HYLUA" "$HYLUA.bak.$(date +%s)" && ok "backed up existing hyprland.lua"
+  printf "[!] Load the cyberpunk theme in %s? (y/N) " "$HYLUA"
+  read -r ans </dev/tty
+  if [ "$ans" = "y" ] || [ "$ans" = "Y" ]; then
+    if [ -f "$HYLUA" ]; then
+      TMP="$(mktemp)"
+      { cat "$HYLUA"; printf '\n%s' "$WRAPLUA"; } > "$TMP" && mv "$TMP" "$HYLUA"
+      ok "appended the theme require at the end of $HYLUA (theme wins any config conflicts)"
+    else
+      printf '%s' "$WRAPLUA" > "$HYLUA"
+      ok "created $HYLUA"
+    fi
+  else
+    warn "add these two lines to $HYLUA yourself:"
+    printf "    ${B}package.path = os.getenv(\"HOME\") .. \"/.config/hypr/themes/cyberpunk/?.lua;\" .. (package.path or \"\")${R}\n"
+    printf "    ${B}require(\"theme\")${R}\n"
   fi
 fi
 
 hdr "KEYBIND CONFLICTS"
-USERCONF="$HOME/.config/hypr/user.conf"
+LUA_BIN="$(command -v lua5.4 || command -v lua || true)"
+THEME_KEYS=""
+if [ -n "$LUA_BIN" ] && [ -f "$THEME/theme.lua" ]; then
+  THEME_KEYS="$("$LUA_BIN" - 2>/dev/null <<'LUAE'
+local combos = {}
+local node
+node = function()
+  return setmetatable({}, {
+    __index = function() return node() end,
+    __call  = function() return {} end,
+  })
+end
+hl = {
+  dsp = node(),
+  exec_cmd = function() end, exec = function() end, exec_once = function() end,
+  on = function() end, env = function() end, config = function() end,
+  curve = function() end, animation = function() end,
+  window_rule = function() end, layer_rule = function() end, plugin = node(),
+  bind = function(mods) combos[#combos + 1] = tostring(mods) end,
+  define_submap = function(_, fn) if type(fn) == "function" then fn() end end,
+}
+local mod = os.getenv("HOME") .. "/.config/hypr/themes/cyberpunk"
+package.path = mod .. "/?.lua;" .. package.path
+local ok, err = pcall(require, "theme")
+if not ok then print("__ERROR__ " .. tostring(err)) end
+for i = 1, #combos do print(combos[i]) end
+LUAE
+)"
+fi
+mapfile -t THEME_RAW <<< "$THEME_KEYS"
+canon() {
+  local combo="$1" t key="" n
+  combo="$(printf '%s' "$combo" | tr '[:lower:]' '[:upper:]')"
+  local -a parts=()
+  read -ra parts <<< "${combo//+ / }"
+  n="${#parts[@]}"; [ "$n" -eq 0 ] && return 0
+  key="${parts[n-1]}"
+  unset 'parts[n-1]'
+  if [ "${#parts[@]}" -gt 0 ]; then
+    t="$(printf '%s\n' "${parts[@]}" | sort | tr '\n' ' ')"
+    printf '%s%s' "${t// /+}" "$key"
+  else
+    printf '%s' "$key"
+  fi
+}
+declare -a THEME_COMBOS=()
+for c in "${THEME_RAW[@]}"; do
+  [[ "$c" == __ERROR__* ]] && { warn "${c#__ERROR__ }"; continue; }
+  [ -z "$c" ] && continue
+  THEME_COMBOS+=("$(canon "$c")")
+done
+THAS() {
+  local want="$1" t
+  for t in "${THEME_COMBOS[@]}"; do [ "$t" = "$want" ] && return 0; done
+  return 1
+}
+lua_scan() {
+  local f="$1" n=0 found=0 ln c raw
+  [ -f "$f" ] || return 0
+  while IFS= read -r ln; do
+    n=$((n+1))
+    raw="$(printf '%s\n' "$ln" | sed -n 's/.*hl\.bind([[:space:]]*["'\'']\([^"'\'']*\)["'\''].*/\1/p')"
+    [ -n "$raw" ] || continue
+    c="$(canon "$raw")"
+    THAS "$c" || continue
+    found=1
+    printf "\n${RED}${B}[!] KEYBINDING CONFLICTING WITH THEME ::${R}\n"
+    printf "  ${YEL}%s:%s${R}  %s\n" "$(basename "$f")" "$n" "$(printf '%s' "$ln" | sed 's/^[[:space:]]*//')"
+    printf "  ${CYAN}THEME USES${R} %s\n" "$c"
+    printf "  remove or rebind it in %s — the theme binds load last and win.\n" "$(basename "$f")"
+  done < "$f"
+  [ "$found" -eq 0 ] && ok "no theme keybind conflicts in $(basename "$f")"
+  return 0
+}
+USERCONF="$HYDIR/user.conf"
 declare -A HVARS=()
 kb_loadvars() {
   local f="$1" ln name val
@@ -410,7 +490,6 @@ kb_loadvars() {
     HVARS["$name"]="$val"
   done < "$f"
 }
-kb_loadvars "$THEME/theme.conf"; kb_loadvars "$HYCONF"; kb_loadvars "$USERCONF"
 kb_expand() {
   local s="$1" name pass
   for pass in 1 2 3; do for name in "${!HVARS[@]}"; do s="${s//\$$name/${HVARS[$name]}}"; done; done
@@ -426,14 +505,6 @@ kb_fields() {
   local body="${1#*=}" rest
   KB_M="${body%%,*}"; rest="${body#*,}"; KB_K="${rest%%,*}"
 }
-declare -A THEME_KEYS=()
-while IFS= read -r ln; do
-  [[ "$ln" =~ ^[[:space:]]*# ]] && continue
-  [[ "$ln" =~ ^[[:space:]]*bind[a-zA-Z]*[[:space:]]*= ]] || continue
-  kb_fields "$ln"
-  [ -n "${KB_K// /}" ] || continue
-  THEME_KEYS["$(kb_combo "$KB_M" "$KB_K")"]="$(printf '%s' "$ln" | sed 's/^[[:space:]]*//')"
-done < "$THEME/theme.conf"
 kb_scan() {
   local f="$1" n=0 found=0 ln c
   [ -f "$f" ] || { warn "$(basename "$f") not found |::| skipped."; return 0; }
@@ -444,7 +515,7 @@ kb_scan() {
     kb_fields "$ln"
     [ -n "${KB_K// /}" ] || continue
     c="$(kb_combo "$KB_M" "$KB_K")"
-    [ -n "${THEME_KEYS[$c]:-}" ] || continue
+    THAS "$c" || continue
     found=1
     if [[ "${KB_K// /}" =~ ^[0-9]$ ]]; then
       sed -i "${n}s|^|#|" "$f" && ok "commented $(basename "$f"):$n"
@@ -452,7 +523,7 @@ kb_scan() {
     fi
     printf "\n${RED}${B}[!] KEYBINDING CONFLICTING WITH THEME ::${R}\n"
     printf "  ${YEL}%s:%s${R}  %s\n" "$(basename "$f")" "$n" "$(printf '%s' "$ln" | sed 's/^[[:space:]]*//')"
-    printf "  ${CYAN}THEME USES${R} %s\n" "${THEME_KEYS[$c]}"
+    printf "  ${CYAN}THEME USES${R} %s\n" "$c"
     printf "[!] Comment this line in %s and set the theme default? (y/N) " "$(basename "$f")"
     read -r ans </dev/tty
     if [ "$ans" = "y" ] || [ "$ans" = "Y" ]; then
@@ -464,32 +535,35 @@ kb_scan() {
   [ "$found" -eq 0 ] && ok "no theme keybind conflicts in $(basename "$f")"
   return 0
 }
-kb_scan "$HYCONF"
+kb_loadvars "$HYDIR/hyprland.conf"; kb_loadvars "$USERCONF"
+lua_scan "$HYLUA"
+lua_scan "$USERCONF".lua
+kb_scan "$HYDIR/hyprland.conf"
 kb_scan "$USERCONF"
 
-hdr "HYPRLAND 0.55 · stale options"
-HYP_NOW="$(hyprctl version 2>/dev/null | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1)"
-if [ -n "$HYP_NOW" ] && [ "$(printf '%s\n%s\n' "0.55" "$HYP_NOW" | sort -V | head -1)" = "0.55" ]; then
-  cfg_scan() {
-    local f="$1" n=0 found=0 ln
-    [ -f "$f" ] || return 0
-    while IFS= read -r ln; do
-      n=$((n+1))
-      [[ "$ln" =~ ^[[:space:]]*# ]] && continue
-      printf '%s' "$ln" | grep -qwiE 'pseudotile|togglesplit|pseudo|vfr' || continue
-      found=1
-      printf "\n${RED}${B}STALE OPTION · removed in Hyprland 0.55 <!>${R}\n"
-      printf "  ${YEL}%s:%s${R}  %s\n" "$(basename "$f")" "$n" "$(printf '%s' "$ln" | sed 's/^[[:space:]]*//')"
+hdr "HYPRLAND · stale options"
+stale_scan() {
+  local f="$1" n=0 found=0 ln
+  [ -f "$f" ] || return 0
+  while IFS= read -r ln; do
+    n=$((n+1))
+    [[ "$ln" =~ ^[[:space:]]*# ]] && continue
+    printf '%s' "$ln" | grep -qiE 'pseudotile|togglesplit|pseudo|vfr|workspace_swipe' || continue
+    found=1
+    printf "\n${RED}${B}STALE OPTION · removed in Hyprland 0.55+ <!>${R}\n"
+    printf "  ${YEL}%s:%s${R}  %s\n" "$(basename "$f")" "$n" "$(printf '%s' "$ln" | sed 's/^[[:space:]]*//')"
+    if [[ "$f" == *.conf ]]; then
       sed -i "${n}s|^|#|" "$f" && ok "commented $(basename "$f"):$n"
-    done < "$f"
-    [ "$found" -eq 0 ] && ok "no stale options in $(basename "$f")"
-    return 0
-  }
-  cfg_scan "$HYCONF"
-  cfg_scan "$USERCONF"
-else
-  ok "Hyprland ${HYP_NOW:-?} |::| stale-option scan skipped (only needed on >= 0.55)."
-fi
+    else
+      warn "remove or migrate this line manually — Lua config can't be safely auto-commented."
+    fi
+  done < "$f"
+  [ "$found" -eq 0 ] && ok "no stale options in $(basename "$f")"
+  return 0
+}
+stale_scan "$HYDIR/hyprland.conf"
+stale_scan "$USERCONF"
+stale_scan "$HYLUA"
 
 hdr "THEME OVERRIDES"
 block_comment() {
@@ -500,19 +574,24 @@ block_comment() {
     awk -v k="$key" '$0 ~ "^[[:space:]]*"k"[[:space:]]*\\{" && !s {s=1; d=0} s {d+=gsub(/{/,"{"); d-=gsub(/}/,"}"); print "#"$0; if(d<=0)s=0; next} {print}' "$f" > "$f.tmp" && mv "$f.tmp" "$f" && ok "commented conflicting $key block in $(basename "$f")"
   done
 }
-block_comment "$HYCONF"
+block_comment "$HYDIR/hyprland.conf"
 block_comment "$USERCONF"
 
-# ── 7 · apply other stuff like kvantum, icons and cursor  ────────────────────
 hdr "ACTIVATE THEMING"
 [ -x "$THEME/scripts/apply_theme" ] && "$THEME/scripts/apply_theme" && ok "icon/cursor/kitty/kvantum theming applied" || warn "apply_theme not run"
 
 hdr "REFRESH HYPRLAND + BUILD hyprbars"
-NEED_RESTART="${HYPR_UPDATED:-0}"  
+NEED_RESTART=0
 if command -v hyprctl >/dev/null 2>&1; then
-  step "hyprctl reload (apply the freshly-sourced theme to the running session)…"
+  step "hyprctl reload (apply the freshly-loaded theme to the running session)…"
   if hyprctl reload >/dev/null 2>&1; then ok "Hyprland reloaded with the theme"
-  else warn "hyprctl reload failed |::| is Hyprland running this session?"; fi
+  elif [ -f "$HYLUA" ]; then
+    warn "hyprctl reload failed |::| the compositor may still be running hyprlang (0.54)."
+    warn "hyprland.lua is present, so the next Hyprland start will be the Lua theme."
+    NEED_RESTART=1
+  else
+    warn "hyprctl reload failed |::| is Hyprland running this session?"
+  fi
 fi
 
 printf "[!] Install custom Hyprbars Plugin? (y/N) "
@@ -520,16 +599,8 @@ read -r ans </dev/tty
 if [ "$ans" = "y" ] || [ "$ans" = "Y" ]; then
   if pkg-config --exists hyprland 2>/dev/null; then
     HVER="$(pkg-config --modversion hyprland 2>/dev/null)"
-    # (needs cmake/cpio/gcc, installed above).
-    if command -v hyprpm >/dev/null 2>&1; then
-      step "hyprpm update (sync plugin headers to running Hyprland)…"
-      hyprpm update || warn "hyprpm update reported issues |::| continuing to the build anyway."
-    fi
-    step "building the cyberpunk titlebars…"
+    step "building the cyberpunk titlebars against Hyprland $HVER…"
     if "$THEME/scripts/build-hyprbars"; then ok "hyprbars.so built + loaded"
-    elif [ $? -eq 3 ]; then
-      warn "custom titlebars NOT built |::| they require Hyprland >= 0.55 (you have ${HVER:-?})."
-      warn "→ update Hyprland to >= 0.55, then run: scripts/build-hyprbars"
     else
       warn "titlebars built but couldn't hot-load |::| they'll come up after Hyprland restarts."
       NEED_RESTART=1
@@ -541,7 +612,6 @@ else
   warn "skipped custom Hyprbars plugin |::| run scripts/build-hyprbars later if you want it."
 fi
 
-# ── done · success screen ───────────────────────────────────────────────────────
 clear
 printf "${RED}${B}"
 cat <<'EOF'
@@ -553,7 +623,7 @@ printf "${R}"
 printf "${GRN}${B}        ░▒▓  INSTALLED SUCCESSFULLY  ▓▒░${R}\n\n"
 printf "${GREY}${B}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${R}\n\n"
 printf "${YEL}${B}  ▸ KEYBINDS   |::|   ⧉ = SUPER + SHIFT${R}\n"
-printf "    ${CYAN}${B}SUPER         App launcher${R}\n"
+printf "    ${CYAN}${B}SUPER + TAB   App launcher${R}\n"
 printf "    ${CYAN}${B}⧉ + T        Terminal${R}\n"
 printf "    ${CYAN}${B}⧉ + K        KILL MODE ${R}${GREY}(click a window to kill · ESC exits)${R}\n"
 printf "    ${CYAN}${B}⧉ + Z        Toggles HUD${R}\n"
@@ -566,10 +636,8 @@ printf "    ${CYAN}${B}⧉ + V        Volume${R}\n"
 printf "    ${CYAN}${B}⧉ + H        Help Menu ${R}${GREY}(List all theme keybinds)${R}\n"
 printf " "
 
-
-
 line
-if [ "${NEED_RESTART:-0}" = 1 ]; then
+if [ "$NEED_RESTART" = 1 ]; then
   printf "${YEL}${B}  ⚠ A Hyprland restart is required to apply changes and bring up the titlebars.${R}\n"
   printf "[!] Restart Hyprland now? (y/N) "
   read -r ans </dev/tty

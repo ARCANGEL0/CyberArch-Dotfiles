@@ -1,4 +1,4 @@
-// STORED: the old multi-row "MESSAGES" notification panel + glitch animation, kept for reuse elsewhere.
+
 import { Window, Box, DrawingArea, EventBox } from "../../widget.ts"
 import { Anchor, Layer, Exclusivity } from "../../widget.ts"
 import { interval, timeout, execAsync } from "astal"
@@ -26,7 +26,7 @@ const DIM_BG: [number, number, number] = [10, 12, 20]
 const SND = `${CYBER_DIR}/assets/audio/notif.mp3`
 const ICON_3D = `${CYBER_DIR}/assets/icons/file.png`
 let phoneIcon: any = null
-// mpv/ffplay
+
 const play = () => execAsync(["sh", "-c", `mpv --no-terminal --really-quiet "${SND}" 2>/dev/null || ffplay -nodisp -autoexit -loglevel quiet "${SND}" 2>/dev/null || paplay "${SND}" 2>/dev/null || play -q "${SND}" 2>/dev/null`]).catch(() => {})
 const clamp = (n: number) => Math.max(0, Math.min(1, n))
 
@@ -45,11 +45,11 @@ const DISMISS_Q = projQuad(ICONW + 145, 4, ICONW + 275, 28)
 const FOOTER_Y = HEADER + MAXROWS * (ROWH + ROW_GAP) + 6
 const CLOSE_Q = projQuad(ICONW + 330, FOOTER_Y + 2, ICONW + 400, FOOTER_Y + 31)
 const DISMISS_FOOTER_Q = projQuad(ICONW + 230, FOOTER_Y + 2, ICONW + 290, FOOTER_Y + 31)
-// header tabs (MESSAGES | APPS) + the new bottom-left dismiss-all
+
 const MSG_TAB_Q = projQuad(ICONW + 16, 2, ICONW + 130, 30)
 const APPS_TAB_Q = projQuad(ICONW + 138, 2, ICONW + 250, 30)
 const DISMISS_BL_Q = projQuad(ICONW + 12, FOOTER_Y + 2, ICONW + 130, FOOTER_Y + 31)
-const APPS_GLYPH = "󰀻"   // nf-md-apps grid — swap this glyph if u want a diff icon
+const APPS_GLYPH = "󰀻"
 const pip = (px: number, py: number, q: [number, number][]) => {
     let inside = false
     for (let i = 0, j = q.length - 1; i < q.length; j = i++) {
@@ -72,7 +72,7 @@ const keycap = (ctx: any, u: number, v: number, label: string, a: number, dx = 0
     projPath(ctx, kp); ctx.setSourceRGBA(NEON.cyan[0]/255, NEON.cyan[1]/255, NEON.cyan[2]/255, 0.95 * a); ctx.setLineWidth(1); ctx.stroke()
     tiltText(ctx, plane, u + s / 2 + dx, v + s / 2 + 4, label, TITLE, 13, NEON.cyan, a, { bold: true, align: "c", glow: 0.6, extraRotate: 0.009 })
 }
-// paint a tray item's pixbuf onto the tilted plane, centered at (u, vCenter)
+
 const drawTrayIcon = (ctx: any, pixbuf: any, u: number, vCenter: number, size: number, a: number) => {
     if (!pixbuf || a <= 0.01) return
     try {
@@ -153,7 +153,7 @@ const onScroll = (_w: any, e: any) => {
         }
     } catch { try { const [, , dy_val] = e.get_scroll_deltas(); if (dy_val > 0.5 || dy_val < -0.5) dy = -dy_val } catch {} }
     if (dy === 0) return true
-    // scroll the open right-click menu instead of the list
+
     if (menuState && menuState.mmax) {
         menuState.mscroll = Math.max(0, Math.min(menuState.mmax, (menuState.mscroll || 0) - dy * 28))
         kick(); return true
@@ -203,7 +203,7 @@ let selectedApp: string | null = null
 let scrollOffset = 0
 let draggingScroll = false
 
-// ── Data corruption glitch state ──
+
 let glitchTimer = 0
 let glitchPhase = 0
 interface GlitchBlock { x: number; y: number; w: number; h: number; alpha: number; life: number; color: [number, number, number] }
@@ -251,7 +251,7 @@ export const dismissAll = () => {
         try { for (const n of (notifd?.get_notifications?.() ?? [])) n.dismiss?.() } catch {}
     }
 }
-// same window-hunt as the popup's E key — find the app in hyprland n jump to it (like double-clickin a KDE notif)
+
 const norm = (s: string) => (s || "").toLowerCase().replace(/[^a-z0-9]/g, "")
 const focusApp = (appRaw: string, desktopEntry: string) => {
     const keys = [norm(desktopEntry), norm(appRaw)].filter((k) => k.length > 1)
@@ -264,7 +264,7 @@ const focusApp = (appRaw: string, desktopEntry: string) => {
             if (c.mapped === false) continue
             const cls = norm(c.class), icls = norm(c.initialClass), t = norm(c.title), it = norm(c.initialTitle)
             for (const k of keys) {
-                let s = 0   // exact class = best, partial class = ok, title = last resort
+                let s = 0
                 if (cls === k || icls === k) s = 100
                 else if (cls.includes(k) || icls.includes(k) || (k.length > 3 && cls.length > 2 && k.includes(cls))) s = 60
                 else if (t.includes(k) || it.includes(k)) s = 30
@@ -286,19 +286,19 @@ const activate = (m: any) => {
             else n.dismiss?.()
         }
     } catch (e) { print("[cyber] activate:", e) }
-    focusApp(m.appRaw, m.desktopEntry)   // ...then jump to the app window too
+    focusApp(m.appRaw, m.desktopEntry)
     removeMsg(m)
 }
 
 const CORRUPT_COLORS: [number, number, number][] = [
-    [45, 35, 40],    // dark grey-brown
-    [55, 40, 45],    // slightly warmer grey
-    [35, 50, 55],    // dark blue-grey
-    [65, 45, 35],    // brown-grey
-    [50, 38, 42],    // neutral grey
-    [40, 30, 50],    // faint purple-grey
-    [160, 30, 25],   // desaturated red (rare accent)
-    [120, 20, 18],   // darker red (rare)
+    [45, 35, 40],
+    [55, 40, 45],
+    [35, 50, 55],
+    [65, 45, 35],
+    [50, 38, 42],
+    [40, 30, 50],
+    [160, 30, 25],
+    [120, 20, 18],
 ]
 
 const drawDataCorruption = (ctx: any, pa: number) => {
@@ -328,7 +328,7 @@ const drawDataCorruption = (ctx: any, pa: number) => {
         const [r, g, b] = block.color
         const a = block.alpha * pa
 
-        // Project block position to screen space
+
         const p = plane.project(block.x, block.y)
         const pw = plane.project(block.x + block.w, block.y)
         const ph = plane.project(block.x, block.y + block.h)
@@ -340,7 +340,7 @@ const drawDataCorruption = (ctx: any, pa: number) => {
         ctx.fill()
     })
 
-    // These are just to give the "screen" texture, not the main effect
+
     const minY = tl[1] + oy, maxY = br[1] + oy
     const minX = tl[0] + ox, maxX = br[0] + ox
     for (let sy = minY; sy < maxY; sy += 4) {
@@ -353,7 +353,7 @@ const drawDataCorruption = (ctx: any, pa: number) => {
         ctx.stroke()
     }
 
-    // ── Header text displacement (rare, brief
+
     if (headerDistort > 0.01) {
         const offset = (Math.random() - 0.5) * 3 * headerDistort
         const hText = view === "detail" && selectedApp ? `MESSAGES > ${selectedApp}` : "MESSAGES"
@@ -375,7 +375,7 @@ const draw = (ctx: any) => {
     const shown = items.slice(0, MAXROWS + 8)
     const pa = clamp(panelIntro / 0.25)
 
-    // ── Phone icon ──
+
     if (animProg > 0) {
         const iconA = clamp(animProg * 6) * pa
         try {
@@ -396,7 +396,7 @@ const draw = (ctx: any) => {
         }
     }
 
-    // ── Content container glass background ──
+
     if (animProg > 0) {
         const GL = ICONW + 10, GR = ICONW + W - 4, GT = HEADER - 19, GB = FOOTER_Y + 2
         fillQuad(ctx, plane, GL, GT, GR, GB, [22, 30, 45], 0.25 * pa)
@@ -406,29 +406,29 @@ const draw = (ctx: any) => {
         strokePath(ctx, plane, [[GR, GT], [GR, GB]], [60, 100, 130], 0.1 * pa, 0.8)
     }
 
-    // ── Header: MESSAGES | APPS tabs ──
+
     if (animProg > 0.10) {
         const labelA = clamp((animProg - 0.10) * 5) * pa
         const msgActive = view !== "apps", appsActive = view === "apps"
         const msgHov = tabHover === "msg", appsHov = tabHover === "apps"
-        const BCYAN: [number, number, number] = [160, 250, 255]   // very bright cyan for active/hover
-        // active (or hovered) tab = bright cyan, inactive = bright red neon — both glow
+        const BCYAN: [number, number, number] = [160, 250, 255]
+
         const tcol = (active: boolean, hov: boolean): [number, number, number] => (active || hov) ? BCYAN : NEON.red
         const mC = tcol(msgActive, msgHov), aC = tcol(appsActive, appsHov)
 
-        // MESSAGES tab (+ breadcrumb in detail)
+
         tiltText(ctx, plane, ICONW + 22, 16, ENVELOPE, ICONF, 13, mC, labelA * 0.9, { bold: true, glow: 0.6 })
         tiltText(ctx, plane, ICONW + 42, 16, "MESSAGES", RAJDHANI, 18, mC, labelA, { bold: true, glow: 0.6 })
         if (view === "detail" && selectedApp) {
             tiltText(ctx, plane, ICONW + 110, 16, ">", ROBOTO_BOLD, 11, BCYAN, labelA, { glow: 0.6 })
             tiltText(ctx, plane, ICONW + 122, 16, selectedApp, ROBOTO_BOLD, 11, BCYAN, labelA, { glow: 0.6 })
         } else {
-            // APPS tab (hidden in detail view to keep the breadcrumb clean)
+
             tiltText(ctx, plane, ICONW + 144, 16, APPS_GLYPH, ICONF, 17, aC, labelA * 0.9, { bold: true, glow: 0.6 })
             tiltText(ctx, plane, ICONW + 166, 16, "APPS", RAJDHANI, 18, aC, labelA, { bold: true, glow: 0.6 })
         }
 
-        // underline under the active tab (bright cyan, matching the active tab)
+
         const barY = 26
         if (view === "detail" && selectedApp) {
             const msgBarEnd = ICONW + 105
@@ -437,17 +437,17 @@ const draw = (ctx: any) => {
             fillQuad(ctx, plane, msgBarEnd + 14, barY, titleBarEnd, barY + 2, BCYAN, 0.75 * labelA)
             strokePath(ctx, plane, [[titleBarEnd + 4, barY + 0.5], [ICONW + W - 8, barY + 0.5]], NEON.red, 0.4 * labelA, 1.2)
         } else {
-            // a bar under each tab, coloured to match it (active/hover = cyan, inactive = red)
+
             fillQuad(ctx, plane, ICONW + 16, barY, ICONW + 128, barY + 2, mC, 0.75 * labelA)
             fillQuad(ctx, plane, ICONW + 138, barY, ICONW + 240, barY + 2, aC, 0.75 * labelA)
             strokePath(ctx, plane, [[ICONW + 250, barY + 0.5], [ICONW + W - 8, barY + 0.5]], NEON.red, 0.4 * labelA, 1.2)
         }
     }
 
-    // ── Data corruption overlay ──
+
     drawDataCorruption(ctx, pa)
 
-    // ── Rows ──
+
     const now = Date.now()
     const visibleH = MAXROWS * (ROWH + ROW_GAP)
     ctx.save()
@@ -490,7 +490,7 @@ const draw = (ctx: any) => {
     } else if (view === "detail" && selectedApp) {
         const detailItems = shown as any[]
 
-        // Compute adaptive frame sizes
+
         const layouts = detailItems.map((m: any) => {
             const body = m.body || "//"
             const idealW = 100 + Math.min(body.length * 4, 286)
@@ -501,7 +501,7 @@ const draw = (ctx: any) => {
             return { fw, fh, cpl, lines, body }
         })
 
-        // Compute Y positions from bottom
+
         const yPos: number[] = []
         let acc = 0
         for (let i = layouts.length - 1; i >= 0; i--) {
@@ -539,7 +539,7 @@ const draw = (ctx: any) => {
             ctx.newPath(); bp.forEach(([x, y], k) => k ? ctx.lineTo(x, y) : ctx.moveTo(x, y)); ctx.closePath()
             ctx.setSourceRGBA(NEON.cyan[0]/255, NEON.cyan[1]/255, NEON.cyan[2]/255, ma * (hovered ? 1 : 0.7)); ctx.setLineWidth(hovered ? 1.5 : 0.8); ctx.stroke()
 
-            // Body text only (no title), wrapped
+
             const ta = Math.min(1, ma * (hovered ? 1.1 : 1))
             let ty = my + 17
             for (let j = 0; j < lines; j++) {
@@ -613,11 +613,11 @@ const bub: [number, number][] = [[x0 + bv, y0], [x1, y0], [x1, y1 - bv], [x1 - b
     }
     ctx.restore()
 
-    // ── Footer ──
+
     const fA = clamp((animProg - 0.30) * 5) * pa
     if (fA > 0.01) {
         strokePath(ctx, plane, [[ICONW + 12, FOOTER_Y], [ICONW + W - 2, FOOTER_Y]], NEON.red, 0.6 * fA, 1.5)
-        // bottom-LEFT dismiss-all (plain clickable, no shortcut) — only in messages views w/ notifs
+
         if (view !== "apps" && getGroups().length > 0) {
             const dc: [number, number, number] = blDismissHover ? NEON.cyan : NEON.red
             const dg = blDismissHover ? 0.9 : 0.5
@@ -628,17 +628,17 @@ const bub: [number, number][] = [[x0 + bv, y0], [x1, y0], [x1, y1 - bv], [x1 - b
         tiltText(ctx, plane, ICONW + 358, FOOTER_Y + 22, "CLOSE", ROBOTO_BOLD, 10, RED, fA, { bold: true, glow: 0.7, bloom: 0.3 })
     }
 
-    // ── tray right-click menu overlay (flat, area-local coords) ──
+
     if (menuState) drawTrayMenu(ctx)
 }
 
 const MENU_ITEM_H = 24, MENU_SEP_H = 8
-// filled quad on the tilted plane from a UV rect
+
 const projRect = (ctx: any, ux: number, uy: number, w: number, h: number) => {
     const q = projQuad(ux, uy, ux + w, uy + h)
     ctx.newPath(); q.forEach(([px, py]: any, i: number) => i ? ctx.lineTo(px, py) : ctx.moveTo(px, py)); ctx.closePath()
 }
-// the right-click menu, drawn IN the plane so it shares the widget's tilt; width auto-fits the text
+
 const drawTrayMenu = (ctx: any) => {
     if (!menuState) return
     const vis = menuState.nodes
@@ -650,24 +650,24 @@ const drawTrayMenu = (ctx: any) => {
     let ux = menuState.ax, uy = menuState.ay
     if (ux + mw > TOTALW - 4) ux = TOTALW - 4 - mw
     if (ux < ICONW + 6) ux = ICONW + 6
-    // RULE: the menu top stays UNDER the selected app — never above it. if it's too tall to fit
-    // below, cap the height and scroll instead (never grow upward past the row).
+
+
     const availBot = FOOTER_Y - 2
     const maxH = Math.max(MENU_ITEM_H + 6, availBot - uy)
     const mh = Math.min(fullH, maxH)
-    const mmax = Math.max(0, fullH - mh)   // how far it can scroll
+    const mmax = Math.max(0, fullH - mh)
     let msc = menuState.mscroll || 0; if (msc > mmax) msc = mmax; if (msc < 0) msc = 0
     menuState.mx = ux; menuState.my = uy; menuState.mh = mh; menuState.mw = mw; menuState.mscroll = msc; menuState.mmax = mmax
-    // bg + border
+
     projRect(ctx, ux, uy, mw, mh); ctx.setSourceRGBA(0.03, 0.05, 0.07, 0.98); ctx.fill()
     projRect(ctx, ux, uy, mw, mh); ctx.setSourceRGBA(NEON.cyan[0] / 255, NEON.cyan[1] / 255, NEON.cyan[2] / 255, 0.9); ctx.setLineWidth(1); ctx.stroke()
-    // clip to the box so scrolled items don't spill
+
     ctx.save(); projRect(ctx, ux, uy, mw, mh); ctx.clip()
     let yy = uy + 4 - msc
     for (let i = 0; i < vis.length; i++) {
         const n = vis[i]
         const h = n.type === "separator" ? MENU_SEP_H : MENU_ITEM_H
-        if (yy + h < uy || yy > uy + mh) { yy += h; continue }   // fully off-box, skip
+        if (yy + h < uy || yy > uy + mh) { yy += h; continue }
         if (n.type === "separator") { strokePath(ctx, plane, [[ux + 8, yy + 4], [ux + mw - 8, yy + 4]], NEON.cyan, 0.25, 0.8); yy += h; continue }
         const hov = i === menuState.hover
         if (hov) { projRect(ctx, ux + 2, yy, mw - 4, MENU_ITEM_H); ctx.setSourceRGBA(NEON.cyan[0] / 255, NEON.cyan[1] / 255, NEON.cyan[2] / 255, 0.18); ctx.fill() }
@@ -677,14 +677,14 @@ const drawTrayMenu = (ctx: any) => {
         yy += h
     }
     ctx.restore()
-    // scrollbar when it overflows
+
     if (mmax > 0) {
         const barH = mh * (mh / fullH), barY = uy + (mh - barH) * (msc / mmax)
         fillQuad(ctx, plane, ux + mw - 4, uy + 2, ux + mw - 2, uy + mh - 2, DIM_RED, 0.4)
         fillQuad(ctx, plane, ux + mw - 4, barY, ux + mw - 2, barY + barH, NEON.cyan, 0.9)
     }
 }
-// hit-test a screen click against the tilted menu quads (-2 = outside → close)
+
 const menuHit = (x: number, y: number): number => {
     if (!menuState || menuState.mx == null) return -1
     const ux = menuState.mx, uy = menuState.my!, mw = menuState.mw!, mh = menuState.mh!
@@ -721,8 +721,8 @@ const kick = () => {
             if (r < 0.35) {
                 hShiftBands.push({
                     y: Math.floor(Math.random() * (H - 4)) + 2,
-                    h: 1 + Math.floor(Math.random() * 3),  // 1-3px tall
-                    shift: (Math.random() > 0.5 ? 1 : -1) * (2 + Math.floor(Math.random() * 6)),  // 2-8px shift
+                    h: 1 + Math.floor(Math.random() * 3),
+                    shift: (Math.random() > 0.5 ? 1 : -1) * (2 + Math.floor(Math.random() * 6)),
                     alpha: 0.15 + Math.random() * 0.25,
                     life: 3 + Math.floor(Math.random() * 6)
                 })
@@ -735,32 +735,32 @@ const kick = () => {
                     glitchBlocks.push({
                         x: baseX + Math.floor(Math.random() * W * 0.5),
                         y: baseY + Math.floor(Math.random() * 20) - 10,
-                        w: 1 + Math.floor(Math.random() * 5),   // 1-5px wide
-                        h: 1 + Math.floor(Math.random() * 3),   // 1-3px tall
+                        w: 1 + Math.floor(Math.random() * 5),
+                        h: 1 + Math.floor(Math.random() * 3),
                         alpha: 0.12 + Math.random() * 0.2,
                         life: 3 + Math.floor(Math.random() * 7),
                         color: color
                     })
                 }
             } else if (r < 0.8) {
-                // Single wider pixel block (bigger corrupted region)
+
                 const color = CORRUPT_COLORS[Math.floor(Math.random() * CORRUPT_COLORS.length)]
                 glitchBlocks.push({
                     x: ICONW + 10 + Math.floor(Math.random() * (W - 40)),
                     y: Math.floor(Math.random() * (H - 10)) + 5,
-                    w: 4 + Math.floor(Math.random() * 12),  // 4-16px wide
-                    h: 1 + Math.floor(Math.random() * 2),   // 1-2px tall
+                    w: 4 + Math.floor(Math.random() * 12),
+                    h: 1 + Math.floor(Math.random() * 2),
                     alpha: 0.08 + Math.random() * 0.15,
                     life: 4 + Math.floor(Math.random() * 8),
                     color: color
                 })
             } else if (r < 0.92) {
-                // Header text displacement
+
                 headerDistort = 0.15 + Math.random() * 0.3
             }
         }
 
-        // Decay corruption effects
+
         hShiftBands = hShiftBands.filter(b => {
             b.life--
             b.alpha *= 0.7
@@ -793,7 +793,7 @@ const add = (n: any) => {
         app: appName,
         title: appName,
         body: (n?.body || "").toString().replace(/\s+/g, " ").slice(0, 240),
-        appRaw: (n?.app_name || "").toString(), desktopEntry,   // keep the real app id so clickin a msg can go find its window
+        appRaw: (n?.app_name || "").toString(), desktopEntry,
         born: Date.now(), out: 0, id: n?.id ?? 0,
     })
     while (msgs.length > MAXROWS + 8) msgs.pop()
@@ -831,16 +831,19 @@ const switchNotifView = (v: "main" | "apps") => {
 const openTrayMenu = (t: TrayItem, rowIdx: number) => {
     trayMenu(t).then(nodes => {
         if (!nodes || !nodes.length) return
-        // drop it UNDER the clicked row (dropdown style) — covers the rows below, keeps the ones above visible
+
         const rowBottom = HEADER + rowIdx * (ROWH + ROW_GAP) - scrollOffset + ROWH - 2
         menuState = { item: t, nodes, ax: ICONW + 44, ay: rowBottom, hover: -1 }; kick()
     })
 }
+const nCbs: any[] = []
+export const onNotifHudChange = (cb) => { nCbs.push(cb) }
+const nFire = () => { for (const cb of nCbs) cb() }
 export const toggleNotifHud = () => {
     if (hudVisible && view === "detail") { switchNotifView("main"); return }
     hudVisible = !hudVisible
     if (hudVisible) { panelIntro = 0; animProg = 0; view = "apps"; selectedApp = null; scrollOffset = 0; menuState = null; win.visible = true; applyInput() }
-    kick()
+    kick(); nFire()
 }
 
 export const NotifHudWindow = () => {
@@ -902,7 +905,7 @@ export const NotifHudWindow = () => {
     evt.connect("button-press-event", (_w, e) => {
         const [x, y] = coords(e)
         let b = 1; try { b = e.get_button?.()[1] ?? 1 } catch { }
-        // right-click menu overlay eats everything while open
+
         if (menuState) {
             const mi = menuHit(x, y)
             if (mi >= 0) {
@@ -912,15 +915,15 @@ export const NotifHudWindow = () => {
             } else menuState = null
             kick(); return false
         }
-        // tabs
+
         if (view !== "detail" && pip(x, y, APPS_TAB_Q)) { switchNotifView("apps"); return false }
         if (pip(x, y, MSG_TAB_Q)) { switchNotifView("main"); return false }
-        // close (M)
+
         if (pip(x, y, CLOSE_Q)) { toggleNotifHud(); return false }
-        // bottom-left dismiss-all (messages views)
+
         if (view !== "apps" && getGroups().length > 0 && pip(x, y, DISMISS_BL_Q)) { clickPulse = 1; kick(); dismissAll(); return false }
         if (inScrollTrack(x, y)) { draggingScroll = true; sDrag(y); return false }
-        // rows
+
         if (view === "apps") {
             const r = rowAt(x, y); const t = trayRows()[r]
             if (t) { if (b === 3) openTrayMenu(t, r); else { trayActivate(t); rowPulse = 1; rowPulseIdx = r; kick() } }
@@ -954,7 +957,7 @@ export const NotifHudWindow = () => {
             try { add((notifd.get_notification ? notifd.get_notification(id) : null) ?? { summary: "", body: "" }) } catch (e) { print("[cyber] popup:", e) }
         })
     } catch (e) { print("[cyber] notifpopup init:", e) }
-    // fire up the tray host + redraw the APPS page whenever the tray changes
+
     try { startTray(); onTrayChange(() => { if (hudVisible && view === "apps") kick() }) } catch (e) { print("[cyber] tray init:", e) }
     return win
 }

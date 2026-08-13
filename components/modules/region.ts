@@ -16,7 +16,7 @@ const clamp = (v) => Math.max(0, Math.min(1, v))
 const easeOut = (t) => 1 - (1 - t) * (1 - t)
 const [RR, RG, RB] = f(NEON.red)
 const [RRR, RRG, RRB] = f(NEON.red)
-const [CR, CG, CB] = f(NEON.cyan)   // card-only accent
+const [CR, CG, CB] = f(NEON.cyan)
 const F25: [number, number, number] = [242, 91, 86]
 let W = SCREEN_WIDTH, H = SCREEN_HEIGHT
 let monX = 0, monY = 0
@@ -25,17 +25,17 @@ let recIconPix: any = null
 try { recIconPix = GdkPixbuf.Pixbuf.new_from_file(`${CYBER_DIR}/assets/icons/record.png`) } catch (e) { print("[region] record.png:", e) }
 let alertPix: any = null
 try { alertPix = GdkPixbuf.Pixbuf.new_from_file(`${CYBER_DIR}/assets/icons/alert.png`) } catch (e) { print("[region] alert.png:", e) }
-// This block is the "region capture" overlay that appears when you hit the hotkey to take a screenshot.
-//  It crashes in with a glitchy corruption effect, then lets you drag a rectangle to select a region, 
-// then dissolves out. The actual screenshot is taken by the main process after this overlay has 
-// finished dissolving.
-const INTRO_MS = 460          // crash-in duration
+
+
+
+
+const INTRO_MS = 460
 const DISSOLVE_MS = 240
-const CARD_DELAY = 140        // card starts shortly after the crash settles
+const CARD_DELAY = 140
 const CARD_DUR = 5200
 const GLYPHS = "0123456789ABCDEFGHJKLMNPQRSTUVWXYZ#%/<>=*"
 
-// compact card and centred, lower-middle at screen
+
 const ICO = 38
 const FRW = 220, FRH = 36
 const CARD_W = ICO + 10 + FRW
@@ -45,14 +45,14 @@ const cardGeom = () => {
  return { cx, cy, frx: cx + ICO + 10, fry: cy }
 }
 
-// state
+
 let rWin = null, rArea = null
 let recordMode = false
 let active = false, dragging = false, draggable = false
 let phase: "intro" | "select" | "dissolve" = "intro"
 let startT = 0, loopT = null
 let curX = 0, curY = 0, sx = 0, sy = 0, ex = 0, ey = 0
-let corruptSurf: any = null   
+let corruptSurf: any = null
 let settled = false
 let dissolveStart = 0
 
@@ -112,15 +112,15 @@ const gstroke = (ctx, col, a, w) => {
 const CYC: [number, number, number] = [CR, CG, CB]
 const REDC: [number, number, number] = [RRR, RRG, RRB]
 
-// the middle reticle: just a 3-line crosshair (two diagonals up-left/up-right, one stem down,
-// a centre dot), all spaced off centre, with a gentle continuous breathe -- kept smooth.
+
+
 const drawCrosshair = (ctx, rev, col) => {
  const cx = W / 2, cy = H / 2
  const ci = easeOut(clamp(rev))
  if (ci <= 0.01) return
  const breathe = 0.5 + 0.5 * Math.sin(Date.now() / 1000 * 1.8)
  const gap = 9 + breathe * 2.5, dlen = 18 * ci, vlen = 20 * ci, a = (0.72 + 0.22 * breathe) * ci
- const vgap = gap * Math.SQRT2   // the diagonals start gap*√2 from centre; match the stem to it so all 3 are equidistant
+ const vgap = gap * Math.SQRT2
  ctx.setLineCap(1)
  ctx.newPath()
  ctx.moveTo(cx - gap, cy - gap); ctx.lineTo(cx - gap - dlen, cy - gap - dlen)
@@ -136,7 +136,7 @@ const drawHud = (ctx, rev) => {
  drawCrosshair(ctx, cal, recordMode ? REDC : CYC)
 }
 
-// thin full-screen lines tracing the cursor position (the "scanner" position readout)
+
 const drawTrace = (ctx) => {
  const col = recordMode ? REDC : CYC
  ctx.setSourceRGBA(col[0], col[1], col[2], 0.16); ctx.setLineWidth(1)
@@ -144,7 +144,7 @@ const drawTrace = (ctx) => {
  ctx.newPath(); ctx.moveTo(curX + 0.5, 0); ctx.lineTo(curX + 0.5, H); ctx.stroke()
 }
 
-// screen-corner brackets — "intercept active" frame
+
 const cornerTicks = (ctx) => {
  ctx.setSourceRGBA(RRR, RRG, RRB, 0.55); ctx.setLineWidth(2)
  const L = 26, m = 18
@@ -166,13 +166,13 @@ const glitchType = (ctx, x, y, full, prog, size, alpha, bold = 1, col = [RR, RG,
      else if (Math.random() < 0.035) ch = GLYPHS[(Math.random() * GLYPHS.length) | 0]
      const head = i >= shown - 1 && i < shown + 1.6
      const cxp = x + i * adv, jx = head ? rnd(-1, 1) : 0
-     // lightened tint of the passed colour as the offset ghost
+
      ctx.setSourceRGBA(Math.min(1, col[0] + 0.5), Math.min(1, col[1] + 0.4), Math.min(1, col[2] + 0.4), alpha * 0.4); ctx.moveTo(cxp - 1.5 + jx, y); ctx.showText(ch)
      ctx.setSourceRGBA(head ? Math.min(1, col[0] * 1.4) : col[0], head ? Math.min(1, col[1] * 1.4) : col[1], head ? Math.min(1, col[2] * 1.4) : col[2], alpha); ctx.moveTo(cxp + jx, y); ctx.showText(ch)
  }
 }
 
-// the icons for the RECORDING hud thingy, same overlay as when hacking cameras in the game
+
 const drawRecIcon = (ctx, x, y, sz, a, pulse) => {
  if (a <= 0 || !recIconPix) return
  const iw = recIconPix.get_width(), ih = recIconPix.get_height()
@@ -185,14 +185,14 @@ const drawRecIcon = (ctx, x, y, sz, a, pulse) => {
      ctx.setSourceRGBA(CR, CG, CB, 0.04 * a * (0.7 + 0.3 * pulse) / g)
      ctx.rectangle(dx - g * 3, dy - g * 3, dw + g * 6, dh + g * 6); ctx.fill()
  }
- ctx.setOperator(2) // SOURCE — paint transparent png directly
+ ctx.setOperator(2)
  const scaled = recIconPix.scale_simple(dw, dh, GdkPixbuf.InterpType.BILINEAR)
  Gdk.cairo_set_source_pixbuf(ctx, scaled, dx, dy)
  ctx.paintWithAlpha(a)
  ctx.restore()
 }
 
-//the beleved card: animated CP2077 cut-frame with red glow, draws in then holds → unloads
+
 const drawCard = (ctx, cp) => {
  const { cx: CX, cy: CY, frx: FRX, fry: FRY } = cardGeom()
  const load = cp < 0.10 ? cp / 0.10 : cp < 0.82 ? 1 : clamp(1 - (cp - 0.82) / 0.18)
@@ -247,9 +247,9 @@ const drawSelChrome = (ctx, X, Y, W2, H2) => {
 }
 
 const drawAlertIcon = (ctx, x, y, sz, a) => {
- if (a <= 0 || !alertPix) return // should get the alert.png from assets or return if not found
- const iw = alertPix.get_width(), ih = alertPix.get_height() 
- const scale = sz / Math.max(iw, ih) 
+ if (a <= 0 || !alertPix) return
+ const iw = alertPix.get_width(), ih = alertPix.get_height()
+ const scale = sz / Math.max(iw, ih)
  const dw = Math.round(iw * scale), dh = Math.round(ih * scale)
  const dx = x + Math.round((sz - dw) / 2), dy = y + Math.round((sz - dh) / 2)
  ctx.save()
@@ -261,7 +261,7 @@ const drawAlertIcon = (ctx, x, y, sz, a) => {
 
 const drawInterceptBanner = (ctx, k) => {
  if (k <= 0.02) return
- if (Math.random() < 0.16) return        // light flicker
+ if (Math.random() < 0.16) return
  const txt = "SIGNAL INTERCEPT"
  ctx.selectFontFace(MONO, 0, 1); ctx.setFontSize(22)
  const tw = ctx.textExtents(txt).width
@@ -272,10 +272,10 @@ const drawInterceptBanner = (ctx, k) => {
 
  drawAlertIcon(ctx, ix, iy, ICON, Math.min(1, k + 0.3))
 
- // vertical divider bar 
+
  const divX = x0 + ICON + GAP
  ctx.setSourceRGBA(0.659, 0.243, 0.212, 0.9); ctx.rectangle(divX, yC - 16, 2.6, 32); ctx.fill()
- // text 
+
  const tx = divX + 3 + DIVGAP, ty = yC + 8
  ctx.setSourceRGBA(1, 0.72, 0.76, 0.35); ctx.moveTo(tx - 1.5, ty); ctx.showText(txt)
  ctx.setSourceRGBA(0.659, 0.243, 0.212, 1.0); ctx.moveTo(tx, ty); ctx.showText(txt)
@@ -322,7 +322,7 @@ const stopLoop = () => { if (loopT) { loopT.cancel(); loopT = null } }
 const tick = () => {
  const now = Date.now()
  if (!settled && (now - startT) >= INTRO_MS) { settled = true; draggable = true }
- rArea.queue_draw()   // keep redrawing — the glitch is animated the whole time the selector is open
+ rArea.queue_draw()
 }
 const ensureLoop = () => { if (!loopT) loopT = interval(16, tick) }
 

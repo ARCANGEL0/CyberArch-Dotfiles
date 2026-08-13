@@ -20,7 +20,7 @@ const plane = makePlane({ w: W, h: H, yaw: -3, pitch: 4, roll: 0, focal: 1300, d
 export const OsdWindow = () => {
  let kind: "vol" | "brt" = "vol"
  let frac = 0, muted = false
- let hideTimer = null
+ let hideTimer = null, brtCtl: any = null
  const area = DrawingArea({})
  area.set_size_request(plane.width, plane.height)
  area.connect("draw", (_w, ctx) => {
@@ -49,8 +49,9 @@ export const OsdWindow = () => {
  area.queue_draw()
  if (!win.visible) { try { (win as any).gdkmonitor = activeMonitor() } catch {} }
  win.visible = true
+ brtCtl && brtCtl(true)
  if (hideTimer) { hideTimer.cancel?.() }
- hideTimer = timeout(1500, () => { win.visible = false })
+ hideTimer = timeout(1500, () => { win.visible = false; brtCtl && brtCtl(false) })
  }
 
  try {
@@ -75,12 +76,13 @@ export const OsdWindow = () => {
  if (bl) {
  const maxB = parseInt(read(`${bl}/max_brightness`)) || 1
  let last = parseInt(read(`${bl}/brightness`)) || 0
- interval(800, () => {
+ let fast = false, bT: any = null
+ const poll = () => {
  const cur = parseInt(read(`${bl}/brightness`)) || 0
- if (cur !== last) {
- last = cur; frac = cur / maxB; muted = false; kind = "brt"; show()
+ if (cur !== last) { last = cur; frac = cur / maxB; muted = false; kind = "brt"; show() }
  }
- })
+ brtCtl = (f: boolean) => { if (f === fast) return; fast = f; if (bT) bT.cancel(); bT = interval(f ? 800 : 8000, poll) }
+ brtCtl(false)
  }
 
  return win

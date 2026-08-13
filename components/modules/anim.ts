@@ -85,7 +85,7 @@ const drawBreach = (ctx, W, H, p, title, sub, flash) => {
  const t2 = `// ${title}`; ctx.moveTo(W / 2 - ctx.textExtents(t2).width / 2, cym + 28); ctx.showText(t2)
 }
 
-// cairo animation helpers
+
 type WsState = {
  win: any, area: any, prog: number, timer: any, seed: number, start: number, busy: boolean,
  cachePix: any, frames: any[], small: any, pixbuf: any, lastCap: number, capPending: boolean,
@@ -93,43 +93,43 @@ type WsState = {
 }
 let wsStates: WsState[] = []
 const WsCairo: any = (imports as any).cairo
-const WS_DURATION = 320  // ms wall-clock for the whole glitch — snappy (~300ms faster)
-const WS_FPS_MS   = 50    // ~20fps playback — plenty for datamosh flicker, light on CPU
-const WS_FRAMES   = 9     // how many shatter frames to pre-render (flipbook length)
-const WS_BANDS    = 14    // horizontal tear bands per frame
-const WS_MAX_SHIFT = 120  // px max sideways displacement of real content
+const WS_DURATION = 320
+const WS_FPS_MS   = 50
+const WS_FRAMES   = 9
+const WS_BANDS    = 14
+const WS_MAX_SHIFT = 120
 const WS_CACHE_TTL = 6000
 
 
 const drawWsGlitchProc = (ctx, W, H, p, seed) => {
- // animation for workspace switch: horizontal tear bands, RGB split, pixel noise, and a quick flash. 
+
  const [rr, rg, rb] = f(NEON.red)
  const [cr, cg, cb] = f(NEON.cyan)
- // Fast envelope: quick in, hold, quick out
+
  const env = p < 0.06 ? p / 0.06 : p < 0.55 ? 1 : 1 - (p - 0.55) / 0.45
  const s = seed
  const t = Date.now()
  const tr = (seed) => { let x = Math.sin(seed) * 43758.5453; return x - Math.floor(x) }
 
- // ── Full-screen dark flash) ──
+
  ctx.setSourceRGBA(0.03, 0.01, 0.02, 0.35 * env)
  ctx.rectangle(0, 0, W, H); ctx.fill()
 
- // horizontal glitch 
+
  for (let i = 0; i < 14; i++) {
-     // Band Y
+
      const bandY = tr(s * 0.1 + i * 0.133) * H * 0.95 + H * 0.025
-     // Band height:
+
      const isThin = tr(s * 0.15 + i * 0.271) > 0.45
      const bandH = isThin
-         ? (8 + tr(s * 0.2 + i * 0.387) * 20)     // 8-28px thin bands
-         : (35 + tr(s * 0.25 + i * 0.431) * 80)   // 35-115px thick bands
-     // Displacemen for big shifts 
+         ? (8 + tr(s * 0.2 + i * 0.387) * 20)
+         : (35 + tr(s * 0.25 + i * 0.431) * 80)
+
      const shiftDir = (i % 2 === 0) ? 1 : -1
      const maxShift = isThin
-         ? (12 + tr(s * 0.3 + i * 0.519) * 25)    // 12-37px for thin
-         : (25 + tr(s * 0.35 + i * 0.571) * 75)   // 25-100px for thick
-     // Animate: fast slide out, hold, fast slide back
+         ? (12 + tr(s * 0.3 + i * 0.519) * 25)
+         : (25 + tr(s * 0.35 + i * 0.571) * 75)
+
      let shiftFactor: number
      if (p < 0.10) shiftFactor = p / 0.10
      else if (p < 0.50) shiftFactor = 1
@@ -143,17 +143,17 @@ const drawWsGlitchProc = (ctx, W, H, p, seed) => {
      ctx.rectangle(shift + shiftDir * 3, bandY + 1, W * 0.85, bandH - 2)
      ctx.fill()
 
-     // ── RGB channel split — Red channel ──
+
      ctx.setSourceRGBA(rr, rg * 0.05, rb * 0.08, (0.12 + tr(s + i * 0.29) * 0.1) * env)
      ctx.rectangle(shift + shiftDir * 8, bandY, W, bandH)
      ctx.fill()
 
-     // ── RGB channel split — Cyan channel ──
+
      ctx.setSourceRGBA(cr * 0.1, cg * 0.5, cb * 0.7, (0.06 + tr(s + i * 0.33) * 0.06) * env)
      ctx.rectangle(shift - shiftDir * 5, bandY, W, bandH)
      ctx.fill()
 
-// channel split tear line
+
      ctx.setSourceRGBA(1, 1, 1, 0.12 * env)
      ctx.setLineWidth(1)
      ctx.moveTo(Math.min(0, shift), bandY)
@@ -168,7 +168,7 @@ const drawWsGlitchProc = (ctx, W, H, p, seed) => {
      }
  }
 
- // ── Blocky data corruption chunks 
+
  for (let i = 0; i < 5; i++) {
      const bx = tr(s * 0.4 + i * 0.317) * W * 0.7 + W * 0.1
      const by = tr(s * 0.45 + i * 0.431) * H * 0.8 + H * 0.1
@@ -179,7 +179,7 @@ const drawWsGlitchProc = (ctx, W, H, p, seed) => {
      ctx.rectangle(bx + bShift, by, bw, bh)
      ctx.fill()
 
-     // RGB splitzz
+
      ctx.setSourceRGBA(rr * 0.4, 0, 0, 0.08 * env)
      ctx.rectangle(bx + bShift + 6, by, bw, bh)
      ctx.fill()
@@ -188,20 +188,20 @@ const drawWsGlitchProc = (ctx, W, H, p, seed) => {
      ctx.fill()
  }
 
- // pixelated noise
+
     for (let i = 0; i < 15; i++) {
      const px = tr(t * 0.0004 + i * 0.191 + s * 0.04) * W
      const py = tr(t * 0.00045 + i * 0.307 + s * 0.05) * H
      const ps = 1 + (tr(s + i * 0.127) * 3 | 0)
      const pa = (0.15 + tr(s + i * 0.41) * 0.25) * env
      const cType = tr(s + i * 0.53)
-     if (cType > 0.6) ctx.setSourceRGBA(1, 0.25, 0.55, pa)     // pink/magenta
-     else if (cType > 0.3) ctx.setSourceRGBA(0.15, 0.7, 0.85, pa)  // cyan
-     else ctx.setSourceRGBA(1, 0.85, 0.15, pa)                   // yellow
+     if (cType > 0.6) ctx.setSourceRGBA(1, 0.25, 0.55, pa)
+     else if (cType > 0.3) ctx.setSourceRGBA(0.15, 0.7, 0.85, pa)
+     else ctx.setSourceRGBA(1, 0.85, 0.15, pa)
      ctx.rectangle(px, py, ps, ps); ctx.fill()
  }
 
- //wokrpace flash
+
  if (p >= 0.18 && p < 0.24) {
      const flashA = (1 - Math.abs(p - 0.21) / 0.03) * 0.15 * env
      ctx.setSourceRGBA(1, 1, 1, Math.max(0, flashA))
@@ -209,20 +209,20 @@ const drawWsGlitchProc = (ctx, W, H, p, seed) => {
  }
 }
 
-// sys failure animations 
+
 const renderShatterFrame = (ctx, W, H, pix, seed) => {
  const tr = (s2) => { const x = Math.sin(s2) * 43758.5453; return x - Math.floor(x) }
  const [rr, rg, rb] = f(NEON.red)
  const [cr, cg, cb] = f(NEON.cyan)
  const NEAR = () => { try { ctx.getSource().setFilter(WsCairo.Filter.NEAREST) } catch {} }
  const s = seed
- const MS = WS_MAX_SHIFT >> 1   
+ const MS = WS_MAX_SHIFT >> 1
 
- // frozen desktop + power-dip cast
+
  Gdk.cairo_set_source_pixbuf(ctx, pix, 0, 0); NEAR(); ctx.paint()
  ctx.setSourceRGBA(0.02, 0, 0.02, 0.22); ctx.rectangle(0, 0, W, H); ctx.fill()
 
- // horizontal displacement bands 
+
  for (let i = 0; i < WS_BANDS; i++) {
      const bandY = tr(s * 0.11 + i * 0.137) * H
      const thin  = tr(s * 0.17 + i * 0.271) > 0.5
@@ -240,19 +240,19 @@ const renderShatterFrame = (ctx, W, H, pix, seed) => {
      ctx.moveTo(0, bandY + 0.5); ctx.lineTo(W, bandY + 0.5); ctx.stroke()
  }
 
- const nBars = 2 + (tr(s * 0.6) * 2 | 0)   // 2-3 per frame
+ const nBars = 2 + (tr(s * 0.6) * 2 | 0)
  for (let i = 0; i < nBars; i++) {
      const by = tr(s * 0.62 + i * 0.277) * H
-     const bh = 1 + tr(s * 0.64 + i * 0.331) * 2                       // thin core
+     const bh = 1 + tr(s * 0.64 + i * 0.331) * 2
      const bx = tr(s * 0.66 + i * 0.419) * W * 0.35
-     const bw = W * (0.45 + tr(s * 0.68 + i * 0.523) * 0.55)           // partial→near-full
-     ctx.setSourceRGBA(rr, rg * 0.05, rb * 0.05, 0.10)                 // soft halo
+     const bw = W * (0.45 + tr(s * 0.68 + i * 0.523) * 0.55)
+     ctx.setSourceRGBA(rr, rg * 0.05, rb * 0.05, 0.10)
      ctx.rectangle(bx, by - 3, bw, bh + 6); ctx.fill()
-     ctx.setSourceRGBA(rr, rg * 0.18, rb * 0.18, 0.5)                  // bright core
+     ctx.setSourceRGBA(rr, rg * 0.18, rb * 0.18, 0.5)
      ctx.rectangle(bx, by, bw, bh); ctx.fill()
  }
 
- // sparse data-corruption specks
+
  for (let i = 0; i < 12; i++) {
      const px = tr(s * 0.81 + i * 0.191) * W, py = tr(s * 0.83 + i * 0.307) * H
      const ps = 1 + (tr(s + i * 0.127) * 2 | 0), pa = 0.12 + tr(s + i * 0.41) * 0.22
@@ -293,14 +293,14 @@ const recache = (st: WsState) => {
  }).catch(() => { st.capPending = false })
 }
 
-// Per animation frame w one scaled blit of a cached frame + a brief flash
+
 const drawWs = (ctx, st: WsState, p) => {
  if (p <= 0 || p >= 1) return
  if (!st.small) { if (!st.pixbuf) drawWsGlitchProc(ctx, st.w, st.h, p, st.seed); return }
  let baseA = 1
  if (p > 0.70) {
-     const tp = (p - 0.70) / 0.30                 // tail 0..1
-     baseA = tp > 0.82 ? 0 : (Math.floor(tp * 5) % 2 === 0 ? 1 : 0)   // on/off strobe -> off
+     const tp = (p - 0.70) / 0.30
+     baseA = tp > 0.82 ? 0 : (Math.floor(tp * 5) % 2 === 0 ? 1 : 0)
  }
  if (baseA <= 0.01) return
  const idx = p < 0.5
@@ -389,11 +389,11 @@ export const triggerShutter = (payload = "") => triggerBanner("SNAPSHOT", "CAPTU
 const getUsername = () => { try { const [ok, bytes] = GLib.file_get_contents("/proc/sys/kernel/hostname"); return ok ? new TextDecoder().decode(bytes).trim() : "USER" } catch { return "USER" } }
 
 const LEFT_W = 200, LEFT_H = 160
-const RIGHT_W = 360, RIGHT_H = 100   // wide enough for CAMERA + POWER on one line
+const RIGHT_W = 360, RIGHT_H = 100
 const BOT_W = 800, BOT_H = 60
-// HUD perspective just like in the game, the two side panels mirror (left edge of the left panel)
-// moderate mirrored HUD perspective (focal 1350 = enough skew to read, not over-warped)
-/// reference for this can be seen at https://interfaceingame.com/wp-content/uploads/02-CamHUD_res-1920x1080.jpg
+
+
+
 
 const leftPlane = makePlane({ w: LEFT_W, h: LEFT_H, yaw: 16, pitch: 1.5, roll: -2.5, focal: 1350, dist: 1350, pad: 34 })
 const rightPlane = makePlane({ w: RIGHT_W, h: RIGHT_H, yaw: -16, pitch: 1.5, roll: 2.5, focal: 1350, dist: 1350, pad: 34 })
@@ -427,14 +427,14 @@ const drawRecLeft = (ctx, tick) => {
  const recBlinkA = 0.3 + 0.7 * Math.abs(Math.sin(recBlink))
 
  tiltText(ctx, leftPlane, 12, 28, "TIME", TITLE, 11, NEON.red, 0.85 * a, { bold: true, glow: 0.6 })
- fillQuad(ctx, leftPlane, 48, 16, 126, 35, [255, 36, 44], a)                    // saturated bright red box
- tiltText(ctx, leftPlane, 56, 30, timeStr, MONO, 12, [10, 0, 2], 1.0 * a, { bold: true })   // crisp DARK digits
+ fillQuad(ctx, leftPlane, 48, 16, 126, 35, [255, 36, 44], a)
+ tiltText(ctx, leftPlane, 56, 30, timeStr, MONO, 12, [10, 0, 2], 1.0 * a, { bold: true })
  tiltText(ctx, leftPlane, 124, 45, "SCANNER", MONO, 6, NEON.red, 0.6 * a, { align: "r", bold: true })
 
- const dotA = (0.62 + 0.38 * Math.abs(Math.sin(recBlink))) * a   //sublte pulse
- const dc = leftPlane.project(18, 52.5), dr = 5 * leftPlane.scaleAt(18, 52.5)   // projected centre + scaled radius
- ctx.setOperator(12); ctx.setSourceRGBA(rr, rg, rb, 0.15 * dotA); ctx.newPath(); ctx.arc(dc[0], dc[1], dr * 1.5, 0, Math.PI * 2); ctx.fill(); ctx.setOperator(2)   // subtle soft glow (rest comes from bloom)
- ctx.setSourceRGBA(rr, rg, rb, dotA); ctx.newPath(); ctx.arc(dc[0], dc[1], dr, 0, Math.PI * 2); ctx.fill()   // circle blip
+ const dotA = (0.62 + 0.38 * Math.abs(Math.sin(recBlink))) * a
+ const dc = leftPlane.project(18, 52.5), dr = 5 * leftPlane.scaleAt(18, 52.5)
+ ctx.setOperator(12); ctx.setSourceRGBA(rr, rg, rb, 0.15 * dotA); ctx.newPath(); ctx.arc(dc[0], dc[1], dr * 1.5, 0, Math.PI * 2); ctx.fill(); ctx.setOperator(2)
+ ctx.setSourceRGBA(rr, rg, rb, dotA); ctx.newPath(); ctx.arc(dc[0], dc[1], dr, 0, Math.PI * 2); ctx.fill()
  tiltText(ctx, leftPlane, 30, 57, "REC", TITLE, 12, NEON.red, 0.95 * a, { bold: true, glow: 0.6 })
 
  tiltText(ctx, leftPlane, 12, 88, "HD", TITLE, 12, NEON.red, 0.85 * a, { bold: true, glow: 0.55 })
@@ -447,17 +447,17 @@ const drawRecRight = (ctx) => {
  const a = recFade
  if (a < 0.01) return
 
- // CAMERA + POWER on ONE line.
- // ⚡ lightning bolt glyph (bigger), projected through the tilt plane
+
+
  const bolt = [[20, 9], [11, 24], [17, 24], [11, 37], [29, 18], [21, 18], [24, 9]]
  const boltPath = () => { ctx.newPath(); for (let i = 0; i < bolt.length; i++) { const q = rightPlane.project(bolt[i][0], bolt[i][1]); if (i === 0) ctx.moveTo(q[0], q[1]); else ctx.lineTo(q[0], q[1]) } ctx.closePath() }
- ctx.setOperator(12); boltPath(); ctx.setSourceRGBA(rr, rg, rb, 0.4 * a); ctx.setLineWidth(5); ctx.setLineJoin(1); ctx.stroke(); ctx.setLineJoin(0); ctx.setOperator(2)   // bolt glow
+ ctx.setOperator(12); boltPath(); ctx.setSourceRGBA(rr, rg, rb, 0.4 * a); ctx.setLineWidth(5); ctx.setLineJoin(1); ctx.stroke(); ctx.setLineJoin(0); ctx.setOperator(2)
  boltPath(); ctx.setSourceRGBA(rr, rg, rb, 0.97 * a); ctx.fill()
  const camName = getUsername()
  tiltText(ctx, rightPlane, 33, 30, `CAMERA 01: ${camName}`, TITLE, 14, NEON.red, 0.95 * a, { bold: true, glow: 0.7 })
- const pwr = "POWER CONNECTED"                                  // same line, far right
- fillQuad(ctx, rightPlane, RIGHT_W - 124, 16, RIGHT_W - 6, 33, [255, 36, 44], a)                        
- tiltText(ctx, rightPlane, RIGHT_W - 13, 29, pwr, MONO, 8, [10, 0, 2], 1.0 * a, { align: "r" })         
+ const pwr = "POWER CONNECTED"
+ fillQuad(ctx, rightPlane, RIGHT_W - 124, 16, RIGHT_W - 6, 33, [255, 36, 44], a)
+ tiltText(ctx, rightPlane, RIGHT_W - 13, 29, pwr, MONO, 8, [10, 0, 2], 1.0 * a, { align: "r" })
 }
 
 const drawRecBot = (ctx, tick) => {
@@ -476,7 +476,7 @@ const drawRecBot = (ctx, tick) => {
  }
 }
 
-// label, like the in-game "CYBERDECK RAM: 5/5" element (not dashes/end-brackets tho)
+
 const drawRecTop = (ctx) => {
  const a = recFade; if (a < 0.01) return
  const [rr, rg, rb] = f(NEON.red)
@@ -486,14 +486,14 @@ const drawRecTop = (ctx) => {
  const gap = 16, lineLen = 180
  const lx2 = cx - tw / 2 - gap, lx1 = lx2 - lineLen
  const rx1 = cx + tw / 2 + gap, rx2 = rx1 + lineLen
- // solid side lines
+
  ctx.setSourceRGBA(rr, rg, rb, 0.7 * a); ctx.setLineWidth(1.2)
  ctx.newPath(); ctx.moveTo(lx1, cy); ctx.lineTo(lx2, cy); ctx.stroke()
  ctx.newPath(); ctx.moveTo(rx1, cy); ctx.lineTo(rx2, cy); ctx.stroke()
  const tick = (x, hh, al) => { ctx.setSourceRGBA(rr, rg, rb, al * a); ctx.setLineWidth(1.5); ctx.newPath(); ctx.moveTo(x, cy - hh); ctx.lineTo(x, cy + hh); ctx.stroke() }
- tick(lx1, 7, 0.9); tick(rx2, 7, 0.9)                       // outer ends
- tick((lx1 + lx2) / 2, 4, 0.7); tick((rx1 + rx2) / 2, 4, 0.7)   // mid
- tick(lx2 - 6, 3, 0.6); tick(rx1 + 6, 3, 0.6)               // inner (near text)
+ tick(lx1, 7, 0.9); tick(rx2, 7, 0.9)
+ tick((lx1 + lx2) / 2, 4, 0.7); tick((rx1 + rx2) / 2, 4, 0.7)
+ tick(lx2 - 6, 3, 0.6); tick(rx1 + 6, 3, 0.6)
  ctx.setOperator(12)
  ctx.setSourceRGBA(rr, rg, rb, 0.35 * a); ctx.moveTo(cx - tw / 2 - 1, cy + 5); ctx.showText(label)
  ctx.setSourceRGBA(rr, rg, rb, 0.35 * a); ctx.moveTo(cx - tw / 2 + 1, cy + 4); ctx.showText(label)
@@ -501,11 +501,11 @@ const drawRecTop = (ctx) => {
  ctx.setSourceRGBA(rr, rg, rb, 0.95 * a); ctx.moveTo(cx - tw / 2, cy + 4); ctx.showText(label)
 }
 
-// ── soft red "glow-blur" bloom (the CP2077 HUD styel look) ──
-// renders the widget to an offscreen surface, then composites downscaled→upscaled blurred copies to create a soft halo around the edges of the widget
+
+
 const recBloom = (screenCtx, w, h, renderFn) => {
  w = Math.ceil(w); h = Math.ceil(h)
- screenCtx.setOperator(0); screenCtx.paint(); screenCtx.setOperator(2)   // clear
+ screenCtx.setOperator(0); screenCtx.paint(); screenCtx.setOperator(2)
  const surf = new WsCairo.ImageSurface(WsCairo.Format.ARGB32, w, h)
  renderFn(new WsCairo.Context(surf)); surf.flush()
  const blurAt = (scale, alpha) => {
@@ -515,15 +515,15 @@ const recBloom = (screenCtx, w, h, renderFn) => {
      c.scale(bw / w, bh / h); c.setSourceSurface(surf, 0, 0)
      try { c.getSource().setFilter(WsCairo.Filter.GOOD) } catch {}
      c.paint(); sm.flush()
-     screenCtx.save(); screenCtx.setOperator(12)                          // ADD = bloom
+     screenCtx.save(); screenCtx.setOperator(12)
      screenCtx.scale(w / bw, h / bh); screenCtx.setSourceSurface(sm, 0, 0)
      try { screenCtx.getSource().setFilter(WsCairo.Filter.GOOD) } catch {}
      screenCtx.paintWithAlpha(alpha); screenCtx.restore(); screenCtx.setOperator(2)
  }
- blurAt(9, 0.5)      // wide soft halo (motion-blur feel)
- blurAt(4, 0.6)      
- blurAt(2, 0.5)    
- screenCtx.setSourceSurface(surf, 0, 0); screenCtx.paint()       
+ blurAt(9, 0.5)
+ blurAt(4, 0.6)
+ blurAt(2, 0.5)
+ screenCtx.setSourceSurface(surf, 0, 0); screenCtx.paint()
 }
 
 export const RecWindow = () => {
@@ -565,7 +565,7 @@ export const RecWindow = () => {
  recTopArea.connect("draw", (_w, ctx) => { recBloom(ctx, REC_TOP_W, REC_TOP_H, (c) => drawRecTop(c)); return false })
  recTopWin = Window({
  name: "rec_top", className: "aug rec_top",
- anchor: Anchor.TOP,                              // centred horizontally at the top
+ anchor: Anchor.TOP,
  layer: Layer.OVERLAY, exclusivity: Exclusivity.IGNORE,
  visible: false, child: Box({ className: "rec-wrap", child: recTopArea }),
  })
@@ -590,13 +590,13 @@ const drawRecIcon = (ctx, x, y, sz, a, pulse) => {
  const dx = x + Math.round((sz - dw) / 2), dy = y + Math.round((sz - dh) / 2)
  ctx.save()
 
-// this is for the glow thing effect around the icon, using additive blending to create a soft halo on it
- ctx.setOperator(12) // ADD
+
+ ctx.setOperator(12)
  for (let g = 3; g >= 1; g--) {
      ctx.setSourceRGBA(rr, rg, rb, 0.035 * a * (0.7 + 0.3 * pulse) / g)
      ctx.rectangle(dx - g * 3, dy - g * 3, dw + g * 6, dh + g * 6); ctx.fill()
  }
- ctx.setOperator(2) // SOURCE — paint the transparent PNG directly, no background
+ ctx.setOperator(2)
  const scaled = recIconPix.scale_simple(dw, dh, GdkPixbuf.InterpType.BILINEAR)
  Gdk.cairo_set_source_pixbuf(ctx, scaled, dx, dy)
  ctx.paintWithAlpha(a)
@@ -617,62 +617,62 @@ const recGlitchText = (ctx, x, y, full, prog, size, alpha) => {
  }
 }
 
-// component for the "RECORDING STARTED" / "RECORDING STOPPED" banner that appears in the middle of the screen
+
 const drawRecBanner = (ctx, W, H, p, msg) => {
  const load = p < 0.08 ? p / 0.08 : p < 0.65 ? 1 : Math.max(0, 1 - (p - 0.65) / 0.35)
  if (load <= 0.001) return
  const [rr, rg, rb] = f(NEON.cyan), pulse = 0.5 + 0.5 * Math.sin(p * 30)
 
- // --- frame geometry (matching player.ts `cut` / panelFrame style) 
- const ico = 42, bw = 360, c = 10  // c = chamfer size (same as player.ts cut way)
- const bh = msg.includes("STARTED") ? 80 : 56   // taller on START so the STOP-hint fits INSIDE
+
+ const ico = 42, bw = 360, c = 10
+ const bh = msg.includes("STARTED") ? 80 : 56
  const totW = ico + 12 + bw, bx = Math.round(W / 2 - totW / 2), by = Math.round(H * 0.72)
  const FX = bx + ico + 12, FY = by
 
- // frame path: cut() style — chamfer top-left + bottom-right, 90° on top-right + bottom-left, adjust if u think its off
+
  const framePath = (ctx2) => {
-    // the corners accordingly
+
      ctx2.newPath()
-     ctx2.moveTo(FX + c, FY)                       // top-left chamfer start
-     ctx2.lineTo(FX + bw, FY)                        // top edge (top-right 90°)
-     ctx2.lineTo(FX + bw, FY + bh - c)               // right edge → chamfer start
-     ctx2.lineTo(FX + bw - c, FY + bh)               // bottom-right chamfer
-     ctx2.lineTo(FX, FY + bh)                        // bottom edge (bottom-left 90°)
-     ctx2.lineTo(FX, FY + c)                         // left edge → chamfer start
+     ctx2.moveTo(FX + c, FY)
+     ctx2.lineTo(FX + bw, FY)
+     ctx2.lineTo(FX + bw, FY + bh - c)
+     ctx2.lineTo(FX + bw - c, FY + bh)
+     ctx2.lineTo(FX, FY + bh)
+     ctx2.lineTo(FX, FY + c)
      ctx2.closePath()
  }
 
- // --- ANIMATION PHASES 
- const lineFrac = Math.min(1, p / 0.04)                // top/bottom line draw progress (fast)
- const closeFrac = Math.min(1, Math.max(0, (p - 0.04) / 0.04)) // vertical close (fast)
- const contentFrac = Math.min(1, Math.max(0, (p - 0.06) / 0.06)) // content fade in (fast)
+
+ const lineFrac = Math.min(1, p / 0.04)
+ const closeFrac = Math.min(1, Math.max(0, (p - 0.04) / 0.04))
+ const contentFrac = Math.min(1, Math.max(0, (p - 0.06) / 0.06))
 
  ctx.save()
  const lw = 1.8
  ctx.setSourceRGBA(rr, rg, rb, 0.95 * load)
  ctx.setLineWidth(lw); ctx.setLineCap(1)
 
- // --- top line: draws from left→right across full width ---
- const topLen = bw - c  // from chamfer tip to right corner
+
+ const topLen = bw - c
  const topDraw = topLen * lineFrac
  ctx.newPath(); ctx.moveTo(FX + c, FY); ctx.lineTo(FX + c + topDraw, FY); ctx.stroke()
 
- // --- bottom line: draws from right→left across full width ---
- const botLen = bw - c  // from left corner to chamfer tip
+
+ const botLen = bw - c
  const botDraw = botLen * lineFrac
  ctx.newPath(); ctx.moveTo(FX + bw - c, FY + bh); ctx.lineTo(FX + bw - c - botDraw, FY + bh); ctx.stroke()
 
- // --- verticals + chamfers close the frame ---
+
  if (closeFrac > 0) {
-     // right vertical (top-right 90° down to bottom-right chamfer)
+
      const rvLen = (bh - c) * closeFrac
      ctx.newPath(); ctx.moveTo(FX + bw, FY); ctx.lineTo(FX + bw, FY + rvLen); ctx.stroke()
 
-     // left vertical (bottom-left 90° up to top-left chamfer)
+
      const lvLen = (bh - c) * closeFrac
      ctx.newPath(); ctx.moveTo(FX, FY + bh); ctx.lineTo(FX, FY + bh - lvLen); ctx.stroke()
 
-     // top-left chamfer diagonal
+
      if (closeFrac > 0.3) {
          const cf = Math.min(1, (closeFrac - 0.3) / 0.7)
          ctx.newPath()
@@ -680,7 +680,7 @@ const drawRecBanner = (ctx, W, H, p, msg) => {
          ctx.stroke()
      }
 
-     // bottom-right chamfer diagonal
+
      if (closeFrac > 0.3) {
          const cf = Math.min(1, (closeFrac - 0.3) / 0.7)
          ctx.newPath()
@@ -689,25 +689,25 @@ const drawRecBanner = (ctx, W, H, p, msg) => {
      }
  }
 
- // --- additive glow on the frame ---
- ctx.setOperator(12) // ADD
+
+ ctx.setOperator(12)
  ctx.setSourceRGBA(rr, rg, rb, 0.06 * load)
  ctx.setLineWidth(lw * 5); ctx.setLineCap(1)
  framePath(ctx); ctx.stroke()
  ctx.setOperator(2)
 
- // --- fill once frame is closed enough ---
+
  if (closeFrac > 0.6) {
      const fillA = Math.min(1, (closeFrac - 0.6) / 0.4) * load
      ctx.setSourceRGBA(0.04, 0.01, 0.02, 0.80 * fillA)
      framePath(ctx); ctx.fill()
 
-     // left accent bar
+
      ctx.setSourceRGBA(rr, rg, rb, 0.90 * fillA)
      ctx.rectangle(FX + 5, FY + 7, 2.5, bh - 14); ctx.fill()
  }
 
- // --->>> content: icon + text 
+
     if (contentFrac > 0) {
      const cA = contentFrac * load
      drawRecIcon(ctx, bx, by + (bh - ico) / 2, ico, cA, pulse)
@@ -718,14 +718,14 @@ const drawRecBanner = (ctx, W, H, p, msg) => {
 
      recGlitchText(ctx, FX + 14, FY + 44, msg, cA, 17, 0.95)
 
-     // small hint INSIDE the START banner (below the main text): how to stop, using the themeMod + R again
+
      if (msg.includes("STARTED")) {
          ctx.selectFontFace(MONO, 0, 1); ctx.setFontSize(8)
          ctx.setSourceRGBA(rr, rg, rb, 0.55 * cA)
          ctx.moveTo(FX + 14, FY + bh - 14); ctx.showText("__/ USE [ KEY + R ] TO STOP RECORDING")
      }
 
-     // flash on appear
+
      if (p > 0.20 && p < 0.32 && Math.floor((p - 0.20) * 80) % 2 === 0) {
          ctx.setSourceRGBA(1, 0.9, 0.92, 0.12 * cA)
          framePath(ctx); ctx.fill()
@@ -880,21 +880,21 @@ const hideRecHud = () => {
  })
 }
 
-// other desktop HUD windows (registered from core.ts)
+
 let _hudWins: any[] = []
 export const registerHudWindows = (wins) => { _hudWins = wins || [] }
 const setHudHidden = (hidden, g = recGeom) => { for (const w of _hudWins) { try { if (sameMonitor(w, g)) w.visible = !hidden } catch {} } }
 const showAllHud = () => { for (const w of _hudWins) { try { w.visible = true } catch {} } }
 export const isRecording = () => recOn
-// toggle the desktop HUD on/off on the recorded monitor while recording.
+
 export const toggleHudDuringRec = () => { recHudShown = !recHudShown; setHudHidden(!recHudShown); return recHudShown }
 
-// play the START/STOP banner transition (~1.5s), then run `done`
+
 const playRecTrans = (dir, msg, done?, g = recGeom) => {
  recTransDir = dir; recBannerMsg = msg; recTransProg = 0; try { recTransWin.gdkmonitor = geomMonitor(g) } catch {} recTransWin.visible = true
  if (recTransTimer) recTransTimer.cancel()
  recTransTimer = interval(16, () => {
-     recTransProg += 0.014   // ~1.1s total (was 0.006 ≈ 2.7s): quick snap-in, short n fast fade
+     recTransProg += 0.014
      if (recTransProg >= 1) {
          recTransTimer.cancel(); recTransTimer = null
          recTransWin.visible = false; recTransDir = null
@@ -912,13 +912,13 @@ export const setRecording = (on, payload = "", region: any = null) => {
      recOn = true; recHudShown = false
      recGeom = g
      showAllHud()
-     setHudHidden(true, g)                           // default: hide normal HUD only on the recorded monitor
-     showRecHud(g)                                   // start rec hud on the recorded monitor
+     setHudHidden(true, g)
+     showRecHud(g)
      if (region) showRecFrame(region, g)
      showToast("RECORDING STARTED", { y: 70, w: 380, h: 46, col: [242, 91, 86], textCol: [242, 91, 86] })
  } else {
      recOn = false
-     hideRecHud()                                    // rec widgets fade out
+     hideRecHud()
      hideRecFrame()
      timeout(180, () => { showToast("RECORDING STOPPED", { y: 70, w: 380, h: 46, col: [242, 91, 86], textCol: [242, 91, 86] }); showAllHud() })
  }

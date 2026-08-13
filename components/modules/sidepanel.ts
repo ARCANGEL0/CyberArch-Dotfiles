@@ -1,7 +1,7 @@
-// top-right minimap + weather panel, cyberpunk 2077 style.
-// small osm map with red frame, a compass marker and geo coords,
-// then a weather bar with 7 day forecast based on  open-meteo api, change if needed to something
-// else like wttr.in if desired. right-click con widget shows modal to changes the city.
+
+
+
+
 import { Box, DrawingArea, EventBox } from "../../widget.ts"
 import Gdk from "gi://Gdk?version=3.0"
 import GLib from "gi://GLib"
@@ -58,14 +58,14 @@ const wxIcon = (desc) => {
  return WXI.sun
 }
 
-// live state
-let geoCity = "NEW YORK", geoCoords = "40.713°N 74.006°W", geoOK = true // default is new york
-let geoLat = 40.7128, geoLon = -74.006, mapTile = null, mapVer = 0 // map point = weather city + small random offset
-let wxLat = 40.7128, wxLon = -74.006, wxName = "NEW YORK", wxFull = "NEW YORK" // weather location, default NYC
+
+let geoCity = "NEW YORK", geoCoords = "40.713°N 74.006°W", geoOK = true
+let geoLat = 40.7128, geoLon = -74.006, mapTile = null, mapVer = 0
+let wxLat = 40.7128, wxLon = -74.006, wxName = "NEW YORK", wxFull = "NEW YORK"
 let wxTemp = "--°", wxDesc = "—", wxFeels = "--°", wxHum = "--", wxWind = "--"
-let netName = "OFFLINE"   // "WiFi: <SSID>" | "Ethernet <n>" | "OFFLINE"
+let netName = "OFFLINE"
 const refreshNet = () => {
- // wifi ssid first, else first connected ethernet, else OFFLINE
+
  execAsync(["sh", "-c", "iwgetid -r 2>/dev/null | sed 's/^/WiFi: /' | grep . || nmcli -t -f TYPE,STATE device 2>/dev/null | awk -F: '$1==\"ethernet\" && $2==\"connected\"{c++; print \"Ethernet \" c; exit}' | grep . || echo OFFLINE"])
      .then((o) => { const s = (o || "").trim(); netName = s || "OFFLINE"; areas.forEach(a => a?.queue_draw()) })
      .catch(() => { netName = "OFFLINE" })
@@ -88,8 +88,8 @@ const WMO = { 0: "Clear", 1: "Mainly clear", 2: "Partly cloudy", 3: "Overcast", 
 const forecast: { day: string; hi: string; lo: string; code: number; pop: number }[] = []
 let areas: any[] = []
 
-// map point follows the city saved from weather, and gets a random location (This theme doesnt track ur location, chill)
-const ro = () => (Math.random() - 0.5) * 0.055 // about 3km random offset
+
+const ro = () => (Math.random() - 0.5) * 0.055
 const setMapPoint = (rerandom) => {
  if (rerandom) { geoLat = wxLat + ro(); geoLon = wxLon + ro() }
  geoCoords = `${Math.abs(geoLat).toFixed(3)}°${geoLat >= 0 ? "N" : "S"} ${Math.abs(geoLon).toFixed(3)}°${geoLon >= 0 ? "E" : "W"}`
@@ -97,7 +97,7 @@ const setMapPoint = (rerandom) => {
  areas.forEach(a => a?.queue_draw()); fetchMap()
 }
 
-// save the city to disk so it stays after a restart
+
 const WX_STORE = `${CYBER_DIR}/city.json`
 const saveWxLocation = () => {
  try { GLib.file_set_contents(WX_STORE, new TextEncoder().encode(JSON.stringify({ name: wxName, full: wxFull, lat: wxLat, lon: wxLon, mapLat: geoLat, mapLon: geoLon }))) } catch (e) { print("[cyber] wx save:", e) }
@@ -115,10 +115,10 @@ const loadWxLocation = () => {
  }
  }
  } catch {}
- setMapPoint(true) // nothing saved yet, random spot near NYC default
+ setMapPoint(true)
 }
 
-// download 3x3 osm tiles around the point, merge them and tint dark
+
 const fetchMap = async () => {
  try {
  const z = 16, nn = 2 ** z
@@ -149,17 +149,17 @@ const refreshWeather = async () => {
  areas.forEach(a => a?.queue_draw())
 }
 
-// square map shape: big bevel on bottom-left, small notch on the left
+
 const MX0 = 14, MY0 = 50, MX1 = W - 14, MY1 = 318
 const BLV = 10
-// notch knobs: NTW = depth, NTY0/NTY1 = top/bottom position, NDD = corner slope
+
 const NTY1 = MY0 + (MY1 - MY0) * 0.74, NTY0 = MY0 + (MY1 - MY0) * 0.24, NTW = 5, NDD = 8
 const MAP_SHAPE = [
- [MX0, MY0], [MX1, MY0], [MX1, MY1], // top-left, top-right, bottom-right
- [MX0 + BLV, MY1], [MX0, MY1 - BLV], // bottom-left bevel
- [MX0, NTY1], [MX0 + NTW, NTY1 - NDD], [MX0 + NTW, NTY0 + NDD], [MX0, NTY0],// small middle-left notch
+ [MX0, MY0], [MX1, MY0], [MX1, MY1],
+ [MX0 + BLV, MY1], [MX0, MY1 - BLV],
+ [MX0, NTY1], [MX0 + NTW, NTY1 - NDD], [MX0 + NTW, NTY0 + NDD], [MX0, NTY0],
 ]
-// fake building boxes, fixed layout (same every run)
+
 const BUILDINGS: [number, number, number, number][] = (() => {
  const b: [number, number, number, number][] = []; let s = 91
  const rnd = () => { s = (s * 48271) % 2147483647; return s / 2147483647 }
@@ -173,12 +173,12 @@ const BUILDINGS: [number, number, number, number][] = (() => {
 const clipMap = (ctx) => {
  ctx.newPath(); MAP_SHAPE.map(([u, v]: [number, number]) => minimap.project(u, v)).forEach(([x, y]: [number, number], i: number) => i ? ctx.lineTo(x, y) : ctx.moveTo(x, y)); ctx.closePath(); ctx.clip()
 }
-// draws the static map: tiles or fake buildings, red frame, coords. cached.
+
 const drawMapStatic = (ctx) => {
  const cx = (MX0 + MX1) / 2, cy = (MY0 + MY1) / 2
- ctx.save(); clipMap(ctx) // clip everything to the map shape
+ ctx.save(); clipMap(ctx)
  if (mapTile) {
- // fit the osm tile image into the projected map box
+
  const c = MAP_SHAPE.map(([u, v]) => minimap.project(u, v)), xs = c.map(p => p[0]), ys = c.map(p => p[1])
  const mnx = Math.min(...xs), mxx = Math.max(...xs), mny = Math.min(...ys), mxy = Math.max(...ys)
  const tw = mapTile.getWidth(), th = mapTile.getHeight()
@@ -195,15 +195,15 @@ const drawMapStatic = (ctx) => {
  ctx.restore()
  strokePath(ctx, minimap, MAP_SHAPE, [81, 104, 111], 0.25, 1.4, true)
  strokePath(ctx, minimap, MAP_SHAPE, [81, 104, 111], 1, 0.9, true)
- // coordinates
+
  tiltText(ctx, minimap, MX1 - 8, MY1 - 10, geoCoords, MONO, 8, geoOK ? NEON.cyan : NEON.red, 0.55, { align: "r" })
 }
-// compass marker on top of the cache, this part animates.
-// shape is a small cyan "A": two legs plus a little v bar in the middle
+
+
 const drawCompassScan = (ctx, tick) => {
  const px = 150 + Math.sin(tick / 30) * 3, py = 216 + Math.cos(tick / 36) * 2
- const legs = [[px - 6, py + 6], [px, py - 7], [px + 6, py + 6]] // the two legs of the A
- const bar = [[px - 3.3, py], [px, py + 3.5], [px + 3.3, py]]    // crossbar, small v pointing down
+ const legs = [[px - 6, py + 6], [px, py - 7], [px + 6, py + 6]]
+ const bar = [[px - 3.3, py], [px, py + 3.5], [px + 3.3, py]]
  strokePath(ctx, minimap, legs, NEON.cyan, 0.3, 3.5)
  strokePath(ctx, minimap, bar, NEON.cyan, 0.3, 3.5)
  strokePath(ctx, minimap, legs, NEON.cyan, 0.95, 1.5)
@@ -212,7 +212,7 @@ const drawCompassScan = (ctx, tick) => {
 const MON3 = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
 const ordDay = (d) => { const j = d % 10, k = d % 100; return d + (j === 1 && k !== 11 ? "st" : j === 2 && k !== 12 ? "nd" : j === 3 && k !== 13 ? "rd" : "th") }
 const fmtDate = (now) => `${ordDay(now.getDate())} ${MON3[now.getMonth()]}, ${now.getFullYear()}`
-// text layer: header, weather, forecast, connection. also cached.
+
 const drawOverlay = (ctx, now) => {
  tiltText(ctx, minimap, MX0 + 8, MY0 + 10, "55S.441.20", MONO, 7, NEON.cyan, 0.34)
  tiltText(ctx, minimap, MX1, MY0 - 5, (geoCity || "NIGHT CITY").slice(0, 32), TITLE, 9, PGREEN, 0.9, { align: "r", bold: true, glow: 0.4 })
@@ -238,8 +238,8 @@ const drawOverlay = (ctx, now) => {
  tiltText(ctx, minimap, cx, fy + 51, d ? d.hi : "--", MONO, 10, today ? NETCOL : NEON.white, 0.9, { align: "c", bold: true })
  tiltText(ctx, minimap, cx, fy + 63, d ? d.lo : "--", MONO, 8, NEON.cyan, 0.5, { align: "c" })
  }
- // connection status: red header, alert chip, then ssid/type
- // amber when connected, red when offline
+
+
  const ny = fy + 121, dx = 72
  const off = !netName || netName === "OFFLINE"
  const stxt = off ? "OFFLINE!" : netName
@@ -263,11 +263,11 @@ export const SidePanel = () => {
  refreshNet(); interval(15_000, refreshNet)
  refreshNetSpeed(); interval(1000, refreshNetSpeed)
  const area = DrawingArea({}); areas.push(area); area.set_size_request(plane.width, plane.height)
- try { mapTile = Cairo.ImageSurface.createFromPNG("/tmp/aug-map.png"); mapVer++ } catch {} // load last saved map png right away
+ try { mapTile = Cairo.ImageSurface.createFromPNG("/tmp/aug-map.png"); mapVer++ } catch {}
  let tick = 0
  area.connect("draw", (_w, ctx) => {
  const now = new Date()
- // cache the whole static widget, rebuild only when minute or data changes
+
  const key = `${mapVer}|${pad2(now.getHours())}${pad2(now.getMinutes())}|${wxName}|${wxTemp}|${wxDesc}|${wxFeels}|${geoCoords}|${geoCity}|${wxHum}|${wxWind}|${netName}|${forecast.map(f => f.hi + f.lo).join("")}`
  if (!cache || cacheKey !== key) {
  cacheKey = key
@@ -276,15 +276,15 @@ export const SidePanel = () => {
  drawMapStatic(cx); drawOverlay(cx, now)
  }
  ctx.setSourceSurface(cache, 0, 0); ctx.paint()
- drawCompassScan(ctx, tick) // only the compass animates
- drawNetSpeed(ctx)          // live up/down speeds
+ drawCompassScan(ctx, tick)
+ drawNetSpeed(ctx)
  return false
  })
  let lastCk = ""
  const t = interval(120, () => { tick++; const ck = Math.round(Math.sin(tick / 30) * 3) + "," + Math.round(Math.cos(tick / 36) * 2); if (ck !== lastCk) { lastCk = ck; area.queue_draw() } })
  area.connect("destroy", () => t.cancel())
 
- // right-click opens the city modal
+
  const evt = EventBox({ child: Box({ className: "side-panel", children: [area] }) })
  try { evt.add_events(Gdk.EventMask.BUTTON_PRESS_MASK) } catch {}
  evt.connect("button-press-event", (_w, e) => {
@@ -296,7 +296,7 @@ export const SidePanel = () => {
  return evt
 }
 
-// city search modal, red glass style. type a name, geocodes via open-meteo
+
 let wxModal: any = null
 let wxQuery = "", wxResults: any[] = [], wxHint = "TYPE A CITY ▸", wxScroll = 0
 let wxSearchTimer: number | null = null

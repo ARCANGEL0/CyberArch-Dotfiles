@@ -211,7 +211,7 @@ const focusApp = (appRaw: string, desktopEntry: string) => {
             if (c.mapped === false) continue
             const cls = norm(c.class), icls = norm(c.initialClass), t = norm(c.title), it = norm(c.initialTitle)
             for (const k of keys) {
-                let s = 0   // exact class hit is gold, partial class ok, title match is a last resort
+                let s = 0
                 if (cls === k || icls === k) s = 100
                 else if (cls.includes(k) || icls.includes(k) || (k.length > 3 && cls.length > 2 && k.includes(cls))) s = 60
                 else if (t.includes(k) || it.includes(k)) s = 30
@@ -235,7 +235,7 @@ export const notifReadCurrent = () => {
             if (act) n.invoke?.(act); else n.dismiss?.()
         }
     } catch (e) { print("[cyber] notifRead:", e) }
-    focusApp(m.appRaw, m.desktopEntry)   // ...then actually jump to the app, like i double-clicked the notif
+    focusApp(m.appRaw, m.desktopEntry)
     removeMsg(m)
 }
 
@@ -260,7 +260,7 @@ const add = (n: any) => {
     const m = {
         app: (generic ? (summary || appName || "MESSAGE") : appName).toUpperCase().slice(0, 24),
         text: ((s) => s.length > 70 ? s.slice(0, 50) + " __[...]" : s)((body || summary || "//")),
-        appRaw: appName, desktopEntry,   // real app name + desktop id, so E can go find the window later
+        appRaw: appName, desktopEntry,
         id: n?.id ?? 0, born: Date.now(), out: 0, prog: 0, y: 0, read: false,
     }
     if (msgs.length === 0) { intro = 0; closing = false; holdUntil = 0 }

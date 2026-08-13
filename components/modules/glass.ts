@@ -1,5 +1,5 @@
-// this is the shared toolkit for the "cyber glass" look -- the angular cyan glass panel,
-// the text drawing, and that glitchy "decode" open animation.
+
+
 
 import Gdk from "gi://Gdk?version=3.0"
 import Pango from "gi://Pango?version=1.0"
@@ -10,33 +10,33 @@ import { makePlane, Plane } from "./proj.ts"
 export const Cairo: any = (imports as any).cairo
 import { TITLE, MONO, ICONF } from "./fonts.ts"
 export { TITLE, MONO, ICONF }
-export const [RR, RG, RB] = f(NEON.cyan)            // the main cyan everything is tinted with
-export const [CR, CG, CB] = f([196, 248, 255])      // a brighter near-white cyan for accents/highlights
+export const [RR, RG, RB] = f(NEON.cyan)
+export const [CR, CG, CB] = f([196, 248, 255])
 export const CYAN: [number, number, number] = [RR, RG, RB]
 export const ACC: [number, number, number] = [CR, CG, CB]
-export const RED: [number, number, number] = f(NEON.red) as any            // the weather modal stays red
-export const RACC: [number, number, number] = [1, 0.42, 0.46]              // brighter red accent to match it
+export const RED: [number, number, number] = f(NEON.red) as any
+export const RACC: [number, number, number] = [1, 0.42, 0.46]
 export const ch = (c: number) => String.fromCharCode(c)
 
-// the modals live dead centre of the screen, so unlike the corner HUD i don't want any
-// fisheye/tilt on them -- this builds a "flat" plane  where focal == dist thus no perspective.
+
+
 export const makeModalPlane = (W: number, H: number): Plane =>
     makePlane({ w: W, h: H, yaw: 0, pitch: 0, roll: 0, focal: 1000, dist: 1000, pad: 30 })
 
-// this traces the actual panel outline -- the angular cyberpunk frame shape. thath as several chamfered edges and notchs on the top right edges and
-// stuff, like an assymetric lateral cut
-export const HEADER = 36                     // how tall the title band at the top is
+
+
+export const HEADER = 36
 export const panelPath = (ctx, x, y, w, h) => {
-    const ny = Math.round(h * 0.42), ndep = 7, ncut = 9, brc = 26, tlc = 8   // tlc = size of the tiny top-left bevel
+    const ny = Math.round(h * 0.42), ndep = 7, ncut = 9, brc = 26, tlc = 8
     const pts = [
-        [x + tlc, y],                        // start just past the small top-left bevel
-        [x + w, y],                          // straight across to the square top-right corner
-        [x + w, y + ny],                     // down the right edge
-        [x + w - ndep, y + ny + ncut],       // bite the chamfer notch inward
-        [x + w - ndep, y + h - brc],         // continue down the now-inset right edge
-        [x + w - ndep - brc, y + h],         // cut the big diagonal bottom-right bevel
-        [x, y + h],                          // back across the bottom
-        [x, y + tlc],                        // up the left edge to where the top-left bevel starts
+        [x + tlc, y],
+        [x + w, y],
+        [x + w, y + ny],
+        [x + w - ndep, y + ny + ncut],
+        [x + w - ndep, y + h - brc],
+        [x + w - ndep - brc, y + h],
+        [x, y + h],
+        [x, y + tlc],
     ]
     ctx.newPath(); pts.forEach(([px, py], i) => i ? ctx.lineTo(px, py) : ctx.moveTo(px, py)); ctx.closePath()
     return pts
@@ -59,10 +59,10 @@ export const drawGlass = (ctx, x, y, w, h, col: [number, number, number] = CYAN)
     panelPath(ctx, x, y, w, h); ctx.setSourceRGBA(lr, lg, lb, 0.92); ctx.setLineWidth(0.9); ctx.stroke()
 }
 
-// two ways to draw text. txt() uses cairo's built-in "toy" font API, fast, fine for
-// fixed ASCII labels. pango() goes through Pango which does proper font fallback, so use
-// that for anything dynamic (song titles, etc.) that might contain weird unicode/glyphs
-// the main font doesn't have. pango() falls back to txt() if it throws for some reason.
+
+
+
+
 let _txtfx = false
 export const setTxtFX = (v) => { _txtfx = v }
 export const txt = (ctx, x, y, s, font, size, col, a, bold = 0, glow = 0) => {
@@ -92,17 +92,17 @@ export const scramble = (s, gl) => (gl > 0.03) ? s.split("").map((c) => (c === "
 
 export const pip = (px, py, poly) => { let inside = false; for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) { const [xi, yi] = poly[i], [xj, yj] = poly[j]; if (((yi > py) !== (yj > py)) && (px < (xj - xi) * (py - yi) / (yj - yi) + xi)) inside = !inside } return inside }
 export const projQuad = (plane: Plane, u0, v0, u1, v1) => [plane.project(u0, v0), plane.project(u1, v0), plane.project(u1, v1), plane.project(u0, v1)]
-// given a click and a projected line segment, returns how far along it you are (0..1).
-// this is how the sliders (volume etc.) know what value you dragged to on a tilted panel.
+
+
 export const segParam = (plane: Plane, u0, v0, u1, v1, px, py) => {
     const L = plane.project(u0, v0), R = plane.project(u1, v1)
     const dx = R[0] - L[0], dy = R[1] - L[1], len2 = dx * dx + dy * dy || 1
     return Math.max(0, Math.min(1, ((px - L[0]) * dx + (py - L[1]) * dy) / len2))
 }
 
-// thisdefinition below handles the animation for the "warp reveal" effect when a modal opens. it takes the screen context, the surface to draw, 
-// the projection plane, the width and height of the surface, an intro value (0..1) that controls how far along the animation is, and a seed
-//  for randomization. it draws horizontal bands of the surface with slight shifts and slides to create a glitchy reveal effect.
+
+
+
 export const warpReveal = (screenCtx, surf, plane: Plane, PW, PH, intro, seed) => {
 
     const e = intro, full = e >= 0.999

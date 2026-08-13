@@ -1,5 +1,5 @@
-// Control modals using Cairo, recreating the "glass" like modals present in the game's UI, like the kiroshi scanner "scan info" and etc
-// (angular cyan glass, perspective warp, etc etc)
+
+
 import { Window, DrawingArea, EventBox, activeMonitor } from "../../widget.ts"
 import { Layer, Exclusivity, Keymode } from "../../widget.ts"
 import { execAsync, interval, timeout } from "astal"
@@ -14,15 +14,16 @@ import {
 import { openWheel, updateWheel, closeWheel, isWheelOpen } from "./appsmenu.ts"
 import { makePlane } from "./proj.ts"
 import { getAurUpdates, cachedAurUpdates, startUpgrade, dismissAurBar } from "./aurbar.ts"
+import { startModalStats, stopModalStats } from "./sys.ts"
 
 const sh = (c) => execAsync(["sh", "-c", c]).catch(() => "")
 
-const YEL = [1, 0.84, 0.12]   // neon yellow — highlights the currently-connected network
+const YEL = [1, 0.84, 0.12]
 const GRN = [0.42, 1, 0.6]
 const HUDRED: [number, number, number] = [0.95, 0.36, 0.34]
 let HUDC: any = null
-// red inside a hud (red holographic) modal, cyan otherwise. lets the shared list/proc widgets grab
-// the right colour on their own instead of passing a colour into every single call
+
+
 const rcBase = (): [number, number, number] => HUDC || [RR, RG, RB]
 const rcLabel = (): [number, number, number] => HUDC ? [1, 0.64, 0.6] : CYAN
 const rcAcc = (): [number, number, number] => HUDC ? [1, 0.58, 0.55] : ACC
@@ -30,11 +31,11 @@ let NCORES = 4
 sh("nproc").then((o) => { NCORES = parseInt(o.trim()) || 4 })
 const fmtTime = (m) => m >= 60 ? `${Math.floor(m / 60)}h ${Math.round(m % 60)}m` : `${Math.round(m)}m`
 
-// spike/history sparkline graph (area + line, framed)
+
 const drawGraph = (ctx, x, y, w, h, data, maxV, col) => {
     ctx.setSourceRGBA(col[0], col[1], col[2], 0.06); ctx.rectangle(x, y, w, h); ctx.fill()
     ctx.setSourceRGBA(col[0], col[1], col[2], 0.22); ctx.setLineWidth(0.8); ctx.rectangle(x, y, w, h); ctx.stroke()
-    ctx.setSourceRGBA(col[0], col[1], col[2], 0.1); ctx.setLineWidth(0.5)   // midline
+    ctx.setSourceRGBA(col[0], col[1], col[2], 0.1); ctx.setLineWidth(0.5)
     ctx.newPath(); ctx.moveTo(x, y + h / 2); ctx.lineTo(x + w, y + h / 2); ctx.stroke()
     if (data.length < 2) return
     const n = data.length, step = w / (n - 1), mv = Math.max(1, maxV)
@@ -46,7 +47,7 @@ const drawGraph = (ctx, x, y, w, h, data, maxV, col) => {
     ctx.setSourceRGBA(col[0], col[1], col[2], 0.95); ctx.setLineWidth(1.4); ctx.stroke()
 }
 
-// reusable widgets (draw + register a hit region)
+
 const drawSlider = (ctx, push, x, ty, trackW, value, onChange) => {
     value = Math.max(0, Math.min(1, value))
     const [sr, sg, sb] = HUDC || [RR, RG, RB], hk = HUDC ? [1, 0.62, 0.58] : [0.85, 0.98, 1]
@@ -66,7 +67,7 @@ const drawBtn = (ctx, push, bx, by, bw, bh, label, on, active = false, col: any 
     const fillA = active ? (hovered ? 0.62 : 0.55) : (hovered ? 0.5 : 0.34)
     const strokeA = active ? (hovered ? 1 : 0.97) : (hovered ? 1 : 0.78)
     btnPath(ctx, bx, by, bw, bh); ctx.setSourceRGBA(col[0] * 0.18, col[1] * 0.18, col[2] * 0.2, fillA); ctx.fill()
-    if (hovered) {   // additive neon glow on hover
+    if (hovered) {
         ctx.setOperator(12)
         btnPath(ctx, bx, by, bw, bh); ctx.setSourceRGBA(col[0], col[1], col[2], 0.45); ctx.setLineWidth(2.6); ctx.stroke()
         ctx.setOperator(2)
@@ -125,7 +126,7 @@ const drawHudFrame = (ctx, x, y, w, h, title) => {
     ctx.moveTo(px + pw - lw2 - 12, fy + 27); ctx.showText(lg)
 }
 
-// ── modal framework ──
+
 export const createModal = (spec) => {
     const { name, W, H, tabTitle } = spec
     const col = spec.col || (spec.hud ? HUDRED : CYAN), accent = spec.accent || (spec.hud ? HUDRED : ACC)
@@ -175,8 +176,8 @@ export const createModal = (spec) => {
     }
     const stopTimers = () => { if (animT) { animT.cancel(); animT = null } if (pollT) { pollT.cancel(); pollT = null } }
 
-    ctrl.open = () => { if (visible) return; visible = true; introTarget = 1; try { win.gdkmonitor = activeMonitor() } catch {} spec.onOpen?.(); win.visible = true; try { win.present?.() } catch {} startTimers(); area && area.queue_draw() }
-    ctrl.close = () => { if (!visible && introTarget === 0) return; visible = false; introTarget = 0; spec.onClose?.(); startTimers() }
+    ctrl.open = () => { if (visible) return; visible = true; introTarget = 1; try { win.gdkmonitor = activeMonitor() } catch {} spec.onOpen?.(); win.visible = true; try { win.present?.() } catch {} startTimers(); area && area.queue_draw(); fireChange() }
+    ctrl.close = () => { if (!visible && introTarget === 0) return; visible = false; introTarget = 0; spec.onClose?.(); fireChange(); startTimers() }
     ctrl.toggle = () => visible ? ctrl.close() : ctrl.open()
     ctrl.isOpen = () => visible
     ctrl.requestDraw = () => area && area.queue_draw()
@@ -231,7 +232,7 @@ export const createModal = (spec) => {
     return ctrl
 }
 
-// ── VOL / MIC / BRIGHTNESS ──
+
 const sectionHeader = (ctx, g, x, y, label, w) => {
     txt(ctx, x, y, label, MONO, 9, g.col, 0.85)
     ctx.selectFontFace(MONO, 0, 0); ctx.setFontSize(9)
@@ -240,13 +241,11 @@ const sectionHeader = (ctx, g, x, y, label, w) => {
 }
 
 const APPS_CMD = `pactl list sink-inputs 2>/dev/null | awk '/^Sink Input #/{if(i!="")print i"|"n"|"v;i=substr($3,2);n="App";v=""}/Volume:/&&v==""{for(k=1;k<=NF;k++)if($k ~ /%$/){g=$k;sub(/%/,"",g);v=g;break}}/[Aa]pplication.name = /{n=$0;sub(/.*= "/,"",n);sub(/".*/,"",n)}END{if(i!="")print i"|"n"|"v}'`
-// small helper to set persistent per-app volume configuration (since im running plain on hyprland and not a DE like KDE, theres no volume control per app, so i had to make this.)
+
 const APPVOL_STATE = `$HOME/.cache/cyberpunk/appvol.conf`
 const shq = (s) => String(s).replace(/'/g, `'\\''`)
 const setAppVol = (name, id, t) => {
     const pct = Math.round(t * 100), nm = shq(name)
-    // write the target volume FIRST, so when the keeper reacts to its own 'change' event it sees a
-    // matching target and doesnt fight back — THEN actually shove it onto the live stream
     sh(`f="${APPVOL_STATE}"; mkdir -p "$(dirname "$f")"; touch "$f"; awk -F= -v n='${nm}' -v v='${pct}' 'BEGIN{s=0}$1==n{print n"="v;s=1;next}{print}END{if(!s)print n"="v}' "$f" > "$f.tmp" && mv "$f.tmp" "$f"; pactl set-sink-input-volume ${id} ${pct}%`)
 }
 const VolCtrl = () => {
@@ -259,9 +258,6 @@ const VolCtrl = () => {
             const want: any = {}
             String(s).trim().split("\n").filter(Boolean).forEach((l) => { const i = l.indexOf("="); if (i > 0) want[l.slice(0, i)] = parseInt(l.slice(i + 1)) })
             st.apps = o.trim().split("\n").filter(Boolean).map((l) => {
-                // APPS_CMD spits out lines like "id|name|volume". split each one, then peek at the 'want'
-                // map (built from APPVOL_STATE) for a saved volume for that app — use that if its there,
-                // otherwise just roll w/ whatever the system reports rn. hand back {id, name, volume 0-1}
                 const a = l.split("|"), name = (a[1] || "App"), live = Math.min(1, (parseInt(a[2]) || 0) / 100), w = want[name]
                 return { id: a[0], name, vol: (w != null && !isNaN(w)) ? Math.min(1, w / 100) : live }
             })
@@ -314,7 +310,6 @@ const BrtCtrl = () => {
     return ctrl
 }
 
-// ── device list + right-click context menu (WiFi / BT etc etc ettc)
 const rowPath = (ctx, x, y, w, h) => { const c = 5; ctx.newPath(); ctx.moveTo(x + c, y); ctx.lineTo(x + w, y); ctx.lineTo(x + w, y + h - c); ctx.lineTo(x + w - c, y + h); ctx.lineTo(x, y + h); ctx.lineTo(x, y + c); ctx.closePath() }
 const ROW_H = 32, ROW_GAP = 6
 const drawList = (ctx, push, x, y, w, h, items, scroll, meta, onClick, onRight) => {
@@ -336,7 +331,7 @@ const drawList = (ctx, push, x, y, w, h, items, scroll, meta, onClick, onRight) 
         push({ kind: "row", bx0: x, by0: ry, bx1: x + w, by1: ry + ROW_H, on: () => onClick(it), onRight: () => onRight(it, x + w - 30, ry + ROW_H - 4) })
     }
     ctx.restore()
-    if (items.length > vis) {                                          // scrollbar
+    if (items.length > vis) {
         const bh = h * vis / items.length, by = y + (h - bh) * (scroll / maxS || 0)
         ctx.setSourceRGBA(BR, BG, BB, 0.5); ctx.rectangle(x + w + 4, by, 3, bh); ctx.fill()
     }
@@ -348,7 +343,7 @@ const drawMenu = (ctx, push, fx, fy, items, onDismiss, X, Y, W, H) => {
     if (mx + mw > X + W - 12) mx = X + W - 12 - mw
     if (my + mh > Y + H - 12) my = Y + H - 12 - mh
     if (mx < X + 12) mx = X + 12; if (my < Y + 12) my = Y + 12
-    push({ kind: "btn", bx0: X, by0: Y, bx1: X + W, by1: Y + H, on: onDismiss })   // dismiss
+    push({ kind: "btn", bx0: X, by0: Y, bx1: X + W, by1: Y + H, on: onDismiss })
     ctx.setOperator(12); menuPath(ctx, mx - 2, my - 2, mw + 4, mh + 4); ctx.setSourceRGBA(RR, RG, RB, 0.25); ctx.setLineWidth(6); ctx.stroke(); ctx.setOperator(2)
     menuPath(ctx, mx, my, mw, mh); ctx.setSourceRGBA(0.02, 0.07, 0.1, 0.97); ctx.fill()
     menuPath(ctx, mx, my, mw, mh); ctx.setSourceRGBA(0.72, 0.96, 1, 0.95); ctx.setLineWidth(0.9); ctx.stroke()
@@ -356,12 +351,9 @@ const drawMenu = (ctx, push, fx, fy, items, onDismiss, X, Y, W, H) => {
         const iy = my + 4 + i * ih
         txt(ctx, mx + 16, iy + ih / 2 + 4, it.label, TITLE, 11, it.danger ? [1, 0.4, 0.44] : CYAN, 0.93, 1)
         if (i > 0) { ctx.setSourceRGBA(RR, RG, RB, 0.18); ctx.rectangle(mx + 6, iy, mw - 12, 1); ctx.fill() }
-        push({ kind: "btn", bx0: mx, by0: iy, bx1: mx + mw, by1: iy + ih, on: () => { it.on(); onDismiss() } })   // items 
+        push({ kind: "btn", bx0: mx, by0: iy, bx1: mx + mw, by1: iy + ih, on: () => { it.on(); onDismiss() } })
     })
 }
-
-// ── WIFI ──
-
 
 const WifiCtrl = () => {
     const st: any = { on: false, nets: [], saved: [], selected: null }
@@ -445,7 +437,6 @@ const WifiCtrl = () => {
     return ctrl
 }
 
-// BLUETOOTH 
 const macsOf = (s) => (s.match(/Device (\S+)/g) || []).map((m) => m.split(" ")[1])
 const BtCtrl = () => {
     const st: any = { on: false, devs: [], paired: [], selected: null }
@@ -522,7 +513,6 @@ const BtCtrl = () => {
     return ctrl
 }
 
-// ── PWR MENU ──
 const PWRBRIGHT: [number, number, number] = [1, 0.58, 0.55]
 const drawPwrBtn = (ctx, push, bx, by, bw, bh, glyph, label, on) => {
     const key = `${bx}|${by}`, hovered = push.hoverKey === key, [hr, hg, hb] = HUDRED
@@ -569,7 +559,6 @@ const procRow = (ctx, push, x, ry, w, p, on, cpuHX, memHX, onClick, onRight, pin
     txt(ctx, memHX - ctx.textExtents(ms).width, ry + ROW_H / 2 + 4, ms, MONO, 10, on ? hl : LBL, 0.85)
     push({ kind: "row", bx0: x, by0: ry, bx1: x + w, by1: ry + ROW_H, on: () => onClick(p), onRight: () => onRight(p) })
 }
-// process list:
 const drawProcList = (ctx, push, x, y, w, h, items, scroll, sel, pinned, onClick, onRight) => {
     const [BR, BG, BB] = rcBase(), LBL = rcLabel()
     const cpuHX = x + w - 92, memHX = x + w - 26
@@ -596,7 +585,6 @@ const drawProcList = (ctx, push, x, y, w, h, items, scroll, sel, pinned, onClick
     if (items.length > vis) { const bh = lh * vis / items.length, by = listTop + (lh - bh) * (scroll / maxS || 0); ctx.setSourceRGBA(BR, BG, BB, 0.5); ctx.rectangle(x + w + 4, by, 3, bh); ctx.fill() }
 }
 
-// ── BATTERY 
 const PROFILES = [["PERFORMANCE", "performance"], ["NEUTRAL", "balanced"], ["ECONOMIC", "power-saver"]]
 const BatCtrl = () => {
     const st: any = { present: true, status: "", pct: 0, rate: 0, mins: 0, perMin: 0, profile: "balanced", apps: [], hist: [] }
@@ -659,7 +647,6 @@ const BatCtrl = () => {
     return ctrl
 }
 
-// ── SYSTEM MONITOR (CPU / RAM graphs + process kille and etc
 const SysCtrl = () => {
     const st: any = { cpu: 0, memU: 0, memT: 1, procs: [], sel: "", selProc: null, scroll: 0, cpuHist: [], ramHist: [] }
     let ctrl
@@ -673,29 +660,28 @@ const SysCtrl = () => {
         if (st.sel) sh(`ps -p ${st.sel} -o comm=,%cpu=,%mem= 2>/dev/null`).then((o) => {
             const t = o.trim()
             if (t) { const p = t.split(/\s+/); st.selProc = { pid: st.sel, name: p.slice(0, p.length - 2).join(" "), cpu: Math.round(parseFloat(p[p.length - 2]) / NCORES), mem: Math.round(parseFloat(p[p.length - 1])) } }
-            ctrl.requestDraw()   
+            ctrl.requestDraw()
         })
     }
     const select = (p) => { st.sel = p.pid; st.selProc = p; st.scroll = 0; ctrl.requestDraw() }
     const killSel = () => { if (st.sel) sh(`kill -9 ${st.sel} 2>/dev/null`).then(() => { st.sel = ""; st.selProc = null; timeout(400, refresh) }) }
     ctrl = createModal({
         name: "sys", tabTitle: "SYSTEM MONITOR", W: 430, H: 432, hud: true,
-        onOpen: () => { st.sel = ""; st.selProc = null; st.scroll = 0; st.cpuHist = []; st.ramHist = []; refresh() }, poll: refresh, pollMs: 1500,
+        onOpen: () => { st.sel = ""; st.selProc = null; st.scroll = 0; st.cpuHist = []; st.ramHist = []; startModalStats(); refresh() },
+        onClose: () => stopModalStats(),
+        poll: refresh, pollMs: 1500,
         onScroll: (d) => { st.scroll = Math.max(0, Math.min(Math.max(0, st.procs.length - 1), st.scroll + d)); ctrl.requestDraw() },
         draw: (ctx, g) => {
             const x = g.X + 20, w = g.w - 40, top = g.Y + HEADER + 14, gw = (w - 14) / 2, gH = 50, BR = rcAcc()
-            // CPU graph
             txt(ctx, x, top + 2, "CPU", MONO, 9, g.col, 0.6)
             ctx.selectFontFace(MONO, 0, 0); ctx.setFontSize(12); let v = `${st.cpu}%`
             txt(ctx, x + gw - ctx.textExtents(v).width, top + 2, v, MONO, 12, BR, 0.96)
             drawGraph(ctx, x, top + 8, gw, gH, st.cpuHist, 100, BR)
-            // RAM graph
             const rx = x + gw + 14
             txt(ctx, rx, top + 2, "MEMORY", MONO, 9, g.col, 0.6)
             v = `${(st.memU / 1024).toFixed(1)}/${(st.memT / 1024).toFixed(1)}G`; ctx.selectFontFace(MONO, 0, 0); ctx.setFontSize(10)
             txt(ctx, rx + gw - ctx.textExtents(v).width, top + 2, v, MONO, 10, g.col, 0.92)
             drawGraph(ctx, rx, top + 8, gw, gH, st.ramHist, 100, g.col)
-            // kill button + section label
             const ky = top + gH + 32
             drawBtn(ctx, g.push, x + w - 124, ky - 18, 124, 24, st.sel ? "FORCE KILL" : "SELECT A PROC", killSel, !!st.sel, g.col, st.sel ? ch(0xf011) : "")
             txt(ctx, x, ky, "// TOP PROCESSES", MONO, 9, g.col, 0.82)
@@ -709,9 +695,8 @@ const SysCtrl = () => {
     return ctrl
 }
 
-// ── KEYBINDS cheat-sheet ──
 const KEYBINDS = [
-    ["SUPER", "APP LAUNCHER"], ["H", "HELP MENU"], ["Z", "HUD OVERLAY"], ["V", "VOLUME"],
+    ["SUPER + TAB", "APP LAUNCHER"], ["H", "HELP MENU"], ["Z", "HUD OVERLAY"], ["V", "VOLUME"],
     ["I", "BRIGHTNESS"], ["U", "SYSTEM UPGRADE"], ["J", "DISMISS UPDATE"], ["M", "MICROPHONE"], ["O", "MUSIC PLAYER"], ["N", "NETWORKS"],
     ["B", "BLUETOOTH"], ["W", "WEATHER"], ["P", "POWER MENU"], ["Y", "BATTERY"],
     ["C", "CPU / RAM"], ["L", "LOCKSCREEN"], ["R", "SCREEN RECORD"], ["S", "SCREENSHOT"],
@@ -725,9 +710,6 @@ const drawKeyCap = (ctx, x, y, label, h) => {
     ctx.setSourceRGBA(0.92, 0.99, 1, 0.97); ctx.moveTo(x + w / 2 - tw / 2, y + h / 2 + 4); ctx.showText(label)
     return w
 }
-// Standard Hyprland window-management binds (shipped in theme.conf). Fixed mods,
-// so they're listed literally — not under the $themeMod prefix above. 
-// These are hyprland keybind related and not to the cyberpunk HUD. Keybinds are individual per change.
 const HYPRBINDS = [
     ["SUPER + SHIFT + F", "FULLSCREEN TOGGLE"],
     ["SUPER + F", "FLOAT / TILE TOGGLE"],
@@ -737,7 +719,6 @@ const HYPRBINDS = [
     ["ALT + SHIFT + 1…0", "WINDOW → WORKSPACE"],
     ["SUPER + D", "PEEK DESKTOP"],
 ]
-// The cheat-sheet prefix follows $themeMod live: read it from theme.conf and
 const readThemeMod = () => {
     try {
         const [ok, bytes] = GLib.file_get_contents(`${CYBER_DIR}/theme.conf`)
@@ -751,7 +732,7 @@ const readThemeMod = () => {
 let keysMod = readThemeMod()
 const KeysCtrl = () => createModal({
     name: "keys", tabTitle: "KEYBINDS", W: 470, H: 600,
-    onOpen: () => { keysMod = readThemeMod() },        // re-read so a changed $themeMod shows up
+    onOpen: () => { keysMod = readThemeMod() },
     draw: (ctx, g) => {
         const x = g.X + 24, top = g.Y + HEADER + 10
         txt(ctx, x, top + 6, `// PREFIX  ${keysMod}  +  KEY`, MONO, 10, ACC, 0.72, 1)
@@ -761,7 +742,7 @@ const KeysCtrl = () => createModal({
             const cw = drawKeyCap(ctx, cx, cy, key, capH)
             txt(ctx, cx + cw + 10, cy + capH / 2 + 4, action, TITLE, 11, CYAN, 0.92, 1)
         })
-        // ── HYPRLAND window-management section ──
+
         const sepY = gridTop + half * rowH + 16
         txt(ctx, x, sepY, "// HYPRLAND", MONO, 10, ACC, 0.72, 1)
         ctx.setSourceRGBA(CYAN[0], CYAN[1], CYAN[2], 0.28); ctx.setLineWidth(1)
@@ -778,7 +759,10 @@ const KeysCtrl = () => createModal({
 
 const cregistry: any = {}
 const register = (c) => { cregistry[c.name] = c; return c.win }
-// ── AUR / SYSTEM UPGRADE ──
+const chgCbs: any[] = []
+export const onModalChange = (cb) => { chgCbs.push(cb) }
+const fireChange = () => { for (const cb of chgCbs) cb() }
+
 const AurCtrl = () => {
     const st: any = { list: [], count: 0, scroll: 0, loading: true }
     let ctrl
@@ -824,7 +808,7 @@ const AurCtrl = () => {
 
 export const CModalWindows = () => [register(VolCtrl()), register(BrtCtrl()), register(WifiCtrl()), register(BtCtrl()), register(PwrCtrl()), register(BatCtrl()), register(SysCtrl()), register(KeysCtrl()), register(AurCtrl())]
 
-// ── dispatcher: routes to the cairo modal ──
+
 export const toggleModal = (name) => {
     if (name === "mic") name = "vol"
     for (const k in cregistry) if (k !== name) cregistry[k].close()
