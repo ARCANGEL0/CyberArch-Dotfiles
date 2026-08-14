@@ -34,7 +34,7 @@ AUR=(
   libastal-gjs-git libastal-notifd-git libastal-wireplumber-git libastal-mpris-git
   pamtester
 )
-HYP_PKGS="hyprland hyprgraphics hyprland-guiutils hyprlock hyprtoolkit hyprwire xdg-desktop-portal-hyprland lua lua54 gcc gcc-libs"
+HYP_PKGS="hyprland hyprgraphics hyprland-guiutils hyprlock hyprtoolkit hyprwire xdg-desktop-portal-hyprland lua lua54 gcc gcc-libs hyprlang ffmpeg ffmpeg4.4 chromaprint"
 
 clear; banner
 
@@ -403,6 +403,20 @@ else
   fi
 fi
 
+hdr "HYPRLAND · legacy hyprland.conf cleanup"
+if [ -f "$HYDIR/hyprland.conf" ]; then
+  warn "hyprland.conf personal keybinds are superseded once the Lua config loads — port any binds into hyprland.lua or the theme."
+  OLDCNT="$(grep -Ec '^\s*source\s*=.*theme\.conf' "$HYDIR/hyprland.conf" 2>/dev/null || echo 0)"
+  if [ "$OLDCNT" -gt 0 ]; then
+    cp -f "$HYDIR/hyprland.conf" "$HYDIR/hyprland.conf.bak.$(date +%s)" 2>/dev/null && ok "backed up hyprland.conf" || warn "couldn't back up hyprland.conf (continuing)"
+    if sed -i -E 's/^(\s*source\s*=.*theme\.conf)/#\1/' "$HYDIR/hyprland.conf"; then
+      ok "commented $OLDCNT stale source line(s) pointing at the deleted theme.conf (fixes the 'source globbing error' until restart)"
+    else
+      warn "couldn't patch hyprland.conf |::| comment the old 'source = .../theme.conf' line manually."
+    fi
+  fi
+fi
+
 hdr "KEYBIND CONFLICTS"
 LUA_BIN="$(command -v lua5.4 || command -v lua || true)"
 THEME_KEYS=""
@@ -583,6 +597,11 @@ hdr "ACTIVATE THEMING"
 hdr "REFRESH HYPRLAND + BUILD hyprbars"
 NEED_RESTART=0
 if command -v hyprctl >/dev/null 2>&1; then
+  PROVIDER="$(hyprctl systeminfo 2>/dev/null | sed -n 's/.*configProvider:[[:space:]]*//p' | head -n1)"
+  if [ -f "$HYLUA" ] && [ -n "$PROVIDER" ] && [ "$PROVIDER" != "lua" ]; then
+    warn "running session registers the $PROVIDER config provider, not lua — the Lua theme loads on the next Hyprland start."
+    NEED_RESTART=1
+  fi
   step "hyprctl reload (apply the freshly-loaded theme to the running session)…"
   if hyprctl reload >/dev/null 2>&1; then ok "Hyprland reloaded with the theme"
   elif [ -f "$HYLUA" ]; then

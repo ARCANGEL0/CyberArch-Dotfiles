@@ -144,7 +144,7 @@ const wireSocket = () => {
  const base = `${GLib.getenv("XDG_RUNTIME_DIR") || `/run/user/${GLib.get_user_name()}`}/hypr`
  const dir = GLib.Dir.open(base, 0); if (!dir) return
  let sock = null, nm
- while ((nm = dir.read_name())) { const p = `${base}/${nm}/socket2.sock`; if (GLib.file_test(p, GLib.FileTest.EXISTS)) { sock = p; break } }
+ while ((nm = dir.read_name())) { const p = `${base}/${nm}/.socket2.sock`; if (GLib.file_test(p, GLib.FileTest.EXISTS)) { sock = p; break } }
  if (!sock) { print("[cyberpunk] hypr socket2 not found"); return }
  const client = new Gio.SocketClient()
  const conn = client.connect(new Gio.UnixSocketAddress({ path: sock }), null)

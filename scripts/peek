@@ -5,16 +5,16 @@ STATE="${XDG_RUNTIME_DIR:-/tmp}/hypr-peek-state"
 SPECIAL="special:peek"
 if [[ -s "$STATE" ]]; then
     while IFS=$'\t' read -r addr ws; do
-        [[ -n "$addr" && -n "$ws" ]] && hyprctl dispatch movetoworkspace "${ws},address:${addr}" >/dev/null 2>&1 || true
+        [[ -n "$addr" && -n "$ws" ]] && hyprctl dispatch "hl.dsp.window.move({ workspace = $ws, window = 'address:$addr' })" >/dev/null 2>&1 || true
     done < "$STATE"
     rm -f "$STATE"
 else
     hyprctl clients -j | jq -r '.[] | select(.workspace.id >= 0) | "\(.address)\t\(.workspace.id)"' > "$STATE"
     if [[ -s "$STATE" ]]; then
         while IFS=$'\t' read -r addr ws; do
-            [[ -n "$addr" ]] && hyprctl dispatch movetoworkspacesilent "${SPECIAL},address:${addr}" >/dev/null 2>&1 || true
+            [[ -n "$addr" ]] && hyprctl dispatch "hl.dsp.window.move({ workspace = '$SPECIAL', follow = false, window = 'address:$addr' })" >/dev/null 2>&1 || true
         done < "$STATE"
-        hyprctl dispatch workspace 1
+        hyprctl dispatch "hl.dsp.focus({ workspace = 1 })"
     else
         rm -f "$STATE"
     fi

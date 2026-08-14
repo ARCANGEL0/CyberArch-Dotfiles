@@ -33,15 +33,16 @@ if [[ ! -d "$DB_DIR" ]]; then
     exit 1
 fi
 
-DB_PATH=$(find "$DB_DIR" -type f -name "*.sqlite" | head -n 1)
+ALL_DBS=$(find "$DB_DIR" -type f -name "*.sqlite")
 
-if [[ -z "$DB_PATH" ]]; then
+if [[ -z "$ALL_DBS" ]]; then
     echo "Error: No sqlite database found in:"
     echo "  $DB_DIR"
     exit 1
 fi
 
-echo "Using database: $DB_PATH"
+for DB_PATH in $ALL_DBS; do
+    echo "Updating database: $DB_PATH"
 
 ###############################################################################
 # Theme checks
@@ -64,6 +65,8 @@ if [[ -z "$NAME" ]]; then
     echo "Error: Theme JSON must contain a 'name' field."
     exit 1
 fi
+
+NAME="Netrunner"
 
 ###############################################################################
 # Build profile object
@@ -138,6 +141,8 @@ sqlite3 "$DB_PATH" "
 INSERT OR REPLACE INTO settings (setting, value)
 VALUES ('_CUSTOM_PROFILES', '$ESCAPED_PROFILES');
 "
+
+done
 
 echo
 echo "✓ Netrunner Profile installed successfully"

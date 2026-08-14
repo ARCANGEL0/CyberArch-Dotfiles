@@ -93,7 +93,7 @@ type WsState = {
 }
 let wsStates: WsState[] = []
 const WsCairo: any = (imports as any).cairo
-const WS_DURATION = 320
+const WS_DURATION = 140
 const WS_FPS_MS   = 50
 const WS_FRAMES   = 9
 const WS_BANDS    = 14

@@ -12,7 +12,7 @@ end
 
 hl.exec_cmd("killall -9 waybar mako dunst swaync 2>/dev/null; systemctl --user stop waybar mako dunst swaync 2>/dev/null || true")
 hl.exec_cmd(os.getenv("HOME") .. "/.local/bin/ags quit -i cyberpunk 2>/dev/null")
-hl.exec_cmd("sleep 1 && " .. os.getenv("HOME") .. "/.local/bin/ags run --gtk 3 " .. cyberpunk .. "/core.ts >/tmp/cyberhypr-debug.log 2>&1")
+hl.exec_cmd("sleep 1 && " .. cyberpunk .. "/scripts/launch-theme")
 hl.exec_cmd(cyberpunk .. "/scripts/ws pin")
 once(cyberpunk .. "/quickshell/lock.sh")
 
@@ -78,10 +78,19 @@ hl.bind("SUPER + SHIFT + right", hl.dsp.window.move({ direction = "right" }))
 hl.bind("SUPER + SHIFT + up",    hl.dsp.window.move({ direction = "up" }))
 hl.bind("SUPER + SHIFT + down",  hl.dsp.window.move({ direction = "down" }))
 
-hl.bind("CTRL + SHIFT + left",  hl.dsp.window.resize({ x = -40, y = 0 }))
-hl.bind("CTRL + SHIFT + right", hl.dsp.window.resize({ x = 40,  y = 0 }))
-hl.bind("CTRL + SHIFT + up",    hl.dsp.window.resize({ x = 0,   y = -40 }))
-hl.bind("CTRL + SHIFT + down",  hl.dsp.window.resize({ x = 0,   y = 40 }))
+hl.bind("SUPER + mouse:272", hl.dsp.window.drag(), { mouse = true })
+hl.bind("SUPER + mouse:273", hl.dsp.window.resize(), { mouse = true })
+hl.bind("SUPER + Q", hl.dsp.window.close())
+
+hl.bind("CTRL + SHIFT + left",  hl.dsp.window.resize({ x = -40, y = 0, relative = true }))
+hl.bind("CTRL + SHIFT + right", hl.dsp.window.resize({ x = 40,  y = 0, relative = true }))
+hl.bind("CTRL + SHIFT + up",    hl.dsp.window.resize({ x = 0,   y = -40, relative = true }))
+hl.bind("CTRL + SHIFT + down",  hl.dsp.window.resize({ x = 0,   y = 40, relative = true }))
+
+hl.bind("SUPER + CTRL + left",  hl.dsp.window.resize({ x = -40, y = 0, relative = true }))
+hl.bind("SUPER + CTRL + right", hl.dsp.window.resize({ x = 40,  y = 0, relative = true }))
+hl.bind("SUPER + CTRL + up",    hl.dsp.window.resize({ x = 0,   y = -40, relative = true }))
+hl.bind("SUPER + CTRL + down",  hl.dsp.window.resize({ x = 0,   y = 40, relative = true }))
 
 for i = 1, 10 do
     local key = i % 10

@@ -1,0 +1,17 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+AGS_BIN="${HOME}/.local/bin/ags"
+CORE_TS="${HOME}/.config/hypr/themes/cyberpunk/core.ts"
+
+[ -x "$AGS_BIN" ] || exit 1
+
+display="${WAYLAND_DISPLAY:-}"
+
+if [ -z "$display" ]; then
+    display="$(ls -t "$XDG_RUNTIME_DIR"/wayland-[0-9]* 2>/dev/null | head -1 | xargs -r basename || true)"
+fi
+
+[ -n "$display" ] || exit 1
+
+exec env WAYLAND_DISPLAY="$display" "$AGS_BIN" run --gtk 3 "$CORE_TS" >/tmp/cyberhypr-debug.log 2>&1

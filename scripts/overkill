@@ -436,7 +436,7 @@ case "${1:-enter}" in
     echo "KILL MODE ON"
     play_snd kiroshi_on.ogg 1.5 150   # the "powering on" blip
     start_hum                          # kick off the looping menu ambience (200% vol)
-    hyprctl dispatch submap kill
+    hyprctl dispatch "hl.dsp.submap('kill')"
     ;;
   kill)
     PID=$(hyprctl clients -j | jq -r --argjson x "$(hyprctl cursorpos -j | jq '.x // 0')" --argjson y "$(hyprctl cursorpos -j | jq '.y // 0')" '[.[] | select(.pid > 1 and .at[0] <= $x and $x < (.at[0]+.size[0]) and .at[1] <= $y and $y < (.at[1]+.size[1]))] | sort_by(.focusHistoryID) | .[0].pid // empty')
@@ -455,7 +455,7 @@ case "${1:-enter}" in
     stop_hum                           # stop the looping menu ambience
     play_snd kiroshi_off.ogg 1.5 150   # the power-down blip
     daemon_alive && kill -USR1 "$(cat "$DAEMON_PID" 2>/dev/null)" 2>/dev/null   # play outro + hide (stays resident)
-    hyprctl dispatch submap reset
+    hyprctl dispatch "hl.dsp.submap('reset')"
     ;;
   stop)
     daemon_alive && kill -TERM "$(cat "$DAEMON_PID" 2>/dev/null)" 2>/dev/null

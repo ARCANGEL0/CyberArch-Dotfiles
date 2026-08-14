@@ -13,4 +13,4 @@ if command -v jq >/dev/null 2>&1 && [ -f "$CRTJSON" ]; then
   } > "$CRTCONF"
 fi
 
-exec cool-retro-term --profile netrunner "$@"
+exec cool-retro-term --profile Netrunner "$@"
