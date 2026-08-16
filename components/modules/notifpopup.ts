@@ -7,6 +7,7 @@ import { TITLE, MONO, NAVINE, NEUE, ORBITRON } from "./fonts.ts"
 import { makePlane, tiltText, strokePath } from "./proj.ts"
 import { setReadFilter, removeFromHistory } from "./notifmessages.ts"
 import { dockNotifDecr } from "./dock.ts"
+import { passthrough } from "./anim.ts"
 
 const Cairo = (imports as any).cairo
 const notifd = AstalNotifd.get_default()
@@ -179,7 +180,7 @@ const kick = () => {
             else if (now >= holdUntil && intro < 1) intro = Math.min(1, intro + 0.045)
         } else if (intro > 0) {
             intro = Math.max(0, intro - 0.05)
-            if (intro <= 0.0001) { msgs = []; closing = false; holdUntil = 0 }
+            if (intro <= 0.0001) { msgs = []; closing = false; holdUntil = 0; try { win.visible = false } catch {} }
         }
         msgs.forEach((m, i) => {
             const target = i * STEP
@@ -193,7 +194,7 @@ const kick = () => {
         area?.queue_draw()
         const animating = closing || intro < 1 || msgs.some((m) => m.prog < 1 || m.out || Math.abs(m.y - msgs.indexOf(m) * STEP) > 0.5)
         const busy = msgs.length > 0 && animating
-        if (!busy && now - lastActivity > 300) { loop.cancel(); loop = null }
+        if (!busy && !closing && now - lastActivity > 300) { loop.cancel(); loop = null }
     })
 }
 
@@ -268,6 +269,7 @@ const add = (n: any) => {
     msgs.unshift(m)
     while (msgs.length > MAXFR) msgs.pop()
     play(); kick()
+    try { win.visible = true } catch {}
     timeout(LIFETIME, () => { if (msgs.includes(m) && !m.read) removeMsg(m) })
 }
 
@@ -277,8 +279,9 @@ export const NotifPopupWindow = () => {
     win = Window({
         name: "notifpopups", className: "aug notifpopups",
         anchor: Anchor.TOP | Anchor.LEFT, layer: Layer.OVERLAY, exclusivity: Exclusivity.IGNORE,
-        child: area,
+        visible: false, child: area,
     })
+    passthrough(win)
     try {
         notifd.connect("notified", (_s: any, id: number) => {
             try { add((notifd.get_notification ? notifd.get_notification(id) : null) ?? { summary: "", body: "" }) } catch (e) { print("[cyber] popup:", e) }

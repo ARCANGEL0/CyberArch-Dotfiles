@@ -7,6 +7,7 @@ import { interval, timeout, execAsync } from "astal"
 import { CYBER_DIR } from "../../env.ts"
 import { TITLE, RAJDHANI, RAJDHANI_MED } from "./fonts.ts"
 import { makePlane, tiltText, strokePath } from "./proj.ts"
+import { passthrough } from "./anim.ts"
 
 const Cairo = (imports as any).cairo
 
@@ -250,6 +251,7 @@ export const AurBarWindow = () => {
         anchor: Anchor.LEFT, layer: Layer.OVERLAY, exclusivity: Exclusivity.IGNORE,
         margin_left: 14, visible: false, child: area,
     })
+    passthrough(win)
     timeout(3500, () => { getAurUpdates().then((r) => { if (r.count > 0) showAurBar() }) })
     recheck = interval(1800000, () => { if (!dismissed) getAurUpdates().then((r) => { if (r.count > 0) showAurBar() }) })
     return win
