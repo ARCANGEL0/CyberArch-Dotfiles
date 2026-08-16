@@ -17,8 +17,9 @@ import Gio from "gi://Gio"
 import GLib from "gi://GLib"
 import Gdk from "gi://Gdk?version=3.0"
 import { COMPONENTS_DIR, CYBER_DIR, SCREEN_WIDTH, SCREEN_HEIGHT } from "./env.ts"
-import { Monitors } from "./components/modules/monitors.ts"
-import { SidePanel, openCityModal } from "./components/modules/sidepanel.ts"
+import { Monitors, setWorkspaceBadge } from "./components/modules/monitors.ts"
+import { SidePanel, openCityModal, openForecastModal } from "./components/modules/sidepanel.ts"
+import { openTimeModal } from "./components/modules/timeset.ts"
 import { Toggles, HorizDock } from "./components/modules/dock.ts"
 import { OsdWindow } from "./components/modules/osd.ts"
 import { NotifPopupWindow, notifReadCurrent, notifDismiss } from "./components/modules/notifpopup.ts"
@@ -68,6 +69,7 @@ let hudOnTop = false
 const Cairo = (imports as any).cairo
 const shapedRegion = (win, rectFill) => {
  try {
+ if (win.get_realized?.() === false || win.get_mapped?.() === false) return null
  const w = win.get_allocated_width?.() || 0, h = win.get_allocated_height?.() || 0
  if (w < 1 || h < 1) return null
  const surf = new Cairo.ImageSurface(Cairo.Format.ARGB32, w, h)
@@ -115,12 +117,29 @@ const surfaceRect = (win) => {
 const applyHudInput = (win) => {
  try {
  const gw = win.get_window?.(); if (!gw) return
- if (hudOnTop) { gw.input_shape_combine_region(null, 0, 0); return }
+ if (hudOnTop) {
+ const aw = win.get_allocated_width?.() || 0, ah = win.get_allocated_height?.() || 0
+ if (aw > 0 && ah > 0) {
+ const full = new Cairo.Region()
+ full.unionRectangle({ x: 0, y: 0, width: aw, height: ah })
+ gw.input_shape_combine_region(full, 0, 0)
+ }
+ return
+ }
  const r = shapedRegion(win, !!(win as any)._rectHit)
  gw.input_shape_combine_region(r || null, 0, 0)
 } catch {}
 }
-const applyHudInputAll = () => { for (const w of hudWins) applyHudInput(w) }
+const applyHudInputAll = () => { for (const w of hudWins) deferShape(w) }
+const deferShape = (win) => {
+ if (win._shapePending) return
+ win._shapePending = true
+ GLib.idle_add(GLib.PRIORITY_DEFAULT_IDLE, () => {
+ win._shapePending = false
+ applyHudInput(win)
+ return GLib.SOURCE_REMOVE
+ })
+}
 const refreshWins = () => Promise.all([execAsync(["hyprctl", "clients", "-j"]), execAsync(["hyprctl", "monitors", "-j"])]).then(([co, mo]) => {
  try {
  const active = new Set<number>()
@@ -152,7 +171,13 @@ const wireSocket = () => {
  const pump = () => stream.read_line_async(0, null, (_src, res) => {
   try {
   const [bytes] = stream.read_line_finish(res)
-  if (bytes) { const ev = bytes.toString().split(">>")[0]; if (EVENT_HITS.has(ev)) pickRefresh() }
+  if (bytes) {
+  const line = bytes.toString(), ev = line.split(">>")[0], data = line.slice(ev.length + 2)
+  if (ev === "workspace") setWorkspaceBadge(data.trim())
+  else if (ev === "workspacev2") setWorkspaceBadge(data.split(",")[1]?.trim() || data.split(",")[0]?.trim())
+  else if (ev === "focusedmon") setWorkspaceBadge(data.split(",")[1]?.trim())
+  if (EVENT_HITS.has(ev)) pickRefresh()
+  }
   pump()
   } catch { try { pump() } catch {} }
  })
@@ -168,9 +193,10 @@ const toggleHudTop = () => {
  for (const w of hudWins) {
  try { if (typeof w.set_layer === "function") w.set_layer(L); else w.layer = L }
  catch (e) { print("[cyberpunk] hud layer:", e) }
- applyHudInput(w)
+ deferShape(w)
  try { w.queue_draw() } catch {}
  }
+ if (!hudOnTop) refreshWins()
 }
 
 
@@ -245,6 +271,12 @@ App.start({
  } else if (request === "weather") {
  try { openCityModal() } catch (e) { print(e) }
  reply("ok")
+ } else if (request === "forecast") {
+ try { openForecastModal() } catch (e) { print(e) }
+ reply("ok")
+ } else if (request === "clock") {
+ try { openTimeModal() } catch (e) { print(e) }
+ reply("ok")
  } else if (request === "aur-dismiss") {
  try { dismissAurBar() } catch (e) { print(e) }
  reply("ok")
@@ -285,12 +317,13 @@ App.start({
  execAsync(["sh", "-c", `'${CYBER_DIR}/scripts/appvol-keeper'`]).catch(() => {})
  for (const w of hudWins) {
  try {
- w.connect("size-allocate", () => timeout(0, () => applyHudInput(w)))
- w.connect("map", () => timeout(0, () => applyHudInput(w)))
+ w.connect("size-allocate", () => deferShape(w))
+ w.connect("map", () => deferShape(w))
  } catch {}
  }
  timeout(400, applyHudInputAll); timeout(1200, applyHudInputAll)
  refreshWins(); wireSocket()
+ execAsync(["hyprctl", "activeworkspace", "-j"]).then((s) => { try { setWorkspaceBadge(JSON.parse(s).name) } catch {} }).catch(() => {})
  interval(30000, refreshWins)
  },
 })

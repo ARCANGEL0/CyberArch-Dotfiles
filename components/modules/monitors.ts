@@ -49,17 +49,13 @@ readDisk(); let batteryV = readBat()
 const poke = Variable(0)
 interval(8000, () => { readDisk(); batteryV = readBat(); poke.set(poke.get() + 1) })
 
-const readTemp = (): number => {
-    for (const z of ["thermal_zone0", "thermal_zone1", "thermal_zone2", "thermal_zone3"]) {
-        const t = parseInt(read(`/sys/class/thermal/${z}/temp`).trim())
-        if (t > 1000 && t < 150000) return Math.round(t / 1000)
-    }
-    return 0
+let badgeVal = "1"
+export const setWorkspaceBadge = (v: any) => {
+    const s = String(v ?? "").trim()
+    if (!s || s === badgeVal) return
+    badgeVal = s
+    poke.set(poke.get() + 1)
 }
-const uptimeDays = () => Math.floor((parseFloat(read("/proc/uptime").split(" ")[0]) || 0) / 86400)
-let badgeVal = "00"
-const refreshBadge = () => { const t = readTemp(); badgeVal = t ? `${t}°` : String(uptimeDays()).padStart(2, "0") }
-refreshBadge(); interval(3000, refreshBadge)
 
 const W = 500, H = 96
 const X0 = 62, MAIN = W - 78, RAMX = X0 + (MAIN - X0) * 0.42, BATX = W - 46
@@ -133,7 +129,7 @@ export const Monitors = () => {
         sto: "STORAGE INFO",
         cpu: "CPU USAGE",
         ram: "RAM USAGE",
-        badge: "SYSTEM STATUS",
+        badge: "ACTIVE WORKSPACE",
     }
 
     const evt = EventBox({ child: area })
@@ -298,7 +294,7 @@ export const Monitors = () => {
             if (Math.abs(di) > 0.04) { (d as any)[k] += di * 0.22; busy = true }
             else if (di !== 0) (d as any)[k] = g[k]
         }
-        const sig = `${cpu.percent.get()}|${ram.substat.get()}|${diskUsedG}|${Math.round(batteryV * 100)}`
+        const sig = `${cpu.percent.get()}|${ram.substat.get()}|${diskUsedG}|${Math.round(batteryV * 100)}|${badgeVal}`
         if (sig !== last) { last = sig; changed = true }
         const now = Date.now()
         if (busy || (changed && now - lastDraw > 320)) { lastDraw = now; area.queue_draw() }
