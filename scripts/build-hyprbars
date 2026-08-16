@@ -8,7 +8,7 @@ if ! pkg-config --exists hyprland; then
 fi
 HVER="$(pkg-config --modversion hyprland)"
 
-HMIN="0.55.0"
+HMIN="0.56.0"
 if [ "$(printf '%s\n%s\n' "$HMIN" "$HVER" | sort -V | head -1)" != "$HMIN" ]; then
     echo "!! this hyprbars plugin needs Hyprland >= $HMIN, but you have $HVER."
     echo "   Update Hyprland (>= $HMIN), then re-run: scripts/build-hyprbars"

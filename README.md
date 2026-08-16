@@ -51,7 +51,7 @@ This is a complete Cyberpunk 2077 themed desktop for **Hyprland**. The HUD is ma
 ### Highlights
 
 - **Health bars** -> The in-game UI bars meant for Health, Stamina, RAM and Level are copied to provide system monitors:
-  - The level badge provides current CPU temperature in Cº, if sensors fail or null it returns the system uptime
+  - The level badge shows the current active workspace, like [1], [2] and etc.
   -  The Health bars provide average usage in % of CPU load using /proc/stat
   -  The RAM bars...well they provide RAM Memory usage, with ramStat()
   -  the top bar on health for experience, provides the current filesystem storage as `Used/Total` 
@@ -142,8 +142,8 @@ This is a complete Cyberpunk 2077 themed desktop for **Hyprland**. The HUD is ma
 ## ⌁ Requirements
 
 - **Arch Linux** (the installer uses `pacman`)
-- **Hyprland ≥ 0.55** (this theme uses custom titlebars that need 0.55's plugin API; optional though, the rest of theme isn't affected)
-- An **AUR helper** — `yay` or `paru` (Always check PKGBUILD btw)
+- **Hyprland ≥ 0.56** (this theme uses custom titlebars that need 0.56's plugin API; optional though, the rest of theme isn't affected)
+- An **AUR helper**: `yay` or `paru` (Always check PKGBUILD btw)
 - A running Hyprland session (so theming + first-run setup can apply)
 
 ---
@@ -161,7 +161,7 @@ The installer is interactive and will:
 
 1. **Dependencies** =>> scan + install missing repo and AUR packages.
 2. **AGS runtime** =>> Installs and symlink the binary and resolve astal/GJS imports.
-3. **Fonts** =>> install bundled Chakra Petch + Rajdhani.
+3. **Fonts** =>> install bundled Orbitron, Rajdhani, Quantico, Tektur, Play, Navine and Roboto.
 4. **Lockscreen** =>> set up quickshell, qt6, and PAM auth.
 5. **cool-retro-term** =>> download AppImage and configure the netrunner profile, and optionally installs fish shell.
 7. **Theme source** =>> prepend `$cyberpunk` + `source=` to `hyprland.conf`.
@@ -172,7 +172,7 @@ The installer is interactive and will:
 
 ## ⌁ Keybinds
 
-The theme modifier is **`$themeMod = SUPER + SHIFT`** (change it at the top of `theme.conf`). Open the full cheat-sheet with all keybinds anytime with **`SUPER+SHIFT+H`**.
+The theme modifier is **`$themeMod = SUPER + SHIFT`** (change it at the top of `theme.lua`). Open the full cheat-sheet with all keybinds anytime with **`SUPER+SHIFT+H`**.
 
 ### HUD & widgets
 
@@ -189,7 +189,8 @@ The theme modifier is **`$themeMod = SUPER + SHIFT`** (change it at the top of `
 | `SUPER + SHIFT + U` | System Upgrade modal |
 | `SUPER + SHIFT + B` | Bluetooth modal |
 | `SUPER + SHIFT + P` | Power menu |
-| `SUPER + SHIFT + W` | Weather |
+| `SUPER + SHIFT + W` | 7-day weather forecast (double-click the city to change location) |
+| `SUPER + SHIFT + -` | System time: timezone, NTP sync, manual set |
 | `SUPER + SHIFT + Y` | Battery modal |
 | `SUPER + SHIFT + C` | CPU / RAM / system modal |
 | `SUPER + SHIFT + H` | Keybind help |
@@ -225,7 +226,7 @@ The theme modifier is **`$themeMod = SUPER + SHIFT`** (change it at the top of `
 ```
 cyberpunk/
 ├─ core.ts              # HUD entry point (AGS / astal / GJS)
-├─ theme.conf          # Hyprland full theme
+├─ theme.lua           # Hyprland full theme
 ├─ install.sh          # interactive installer
 ├─ components/
 │  ├─ modules/         # every widget (monitors, sidepanel, dock, modals, anim, …)
