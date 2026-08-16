@@ -1,4 +1,4 @@
-/* Cyberpunk netrunner GTK theme
+/* Cyberpunk netrunner GTK theme */
 /* ── palette (translucent = glass) ─────────────────────────────────────── */
 @define-color cy_bg     rgba(7,9,13,0.88);      /* window (glassy)        */
 @define-color cy_bg2    rgba(16,11,14,0.93);    /* raised surfaces        */
