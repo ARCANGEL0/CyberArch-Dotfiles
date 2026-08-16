@@ -564,7 +564,7 @@ stale_scan() {
     [[ "$ln" =~ ^[[:space:]]*# ]] && continue
     printf '%s' "$ln" | grep -qiE 'pseudotile|togglesplit|pseudo|vfr|workspace_swipe' || continue
     found=1
-    printf "\n${RED}${B}STALE OPTION · removed in Hyprland 0.55+ <!>${R}\n"
+    printf "\n${RED}${B}STALE OPTION · removed in Hyprland 0.56+ <!>${R}\n"
     printf "  ${YEL}%s:%s${R}  %s\n" "$(basename "$f")" "$n" "$(printf '%s' "$ln" | sed 's/^[[:space:]]*//')"
     if [[ "$f" == *.conf ]]; then
       sed -i "${n}s|^|#|" "$f" && ok "commented $(basename "$f"):$n"
@@ -590,6 +590,56 @@ block_comment() {
 }
 block_comment "$HYDIR/hyprland.conf"
 block_comment "$USERCONF"
+
+hdr "CYBER TERMINAL"
+GTSRC="$THEME/assets/rio"
+GTCFG="$HOME/.config/rio"
+GTBIN="$HOME/.cargo/bin/rio"
+GTVER="0.4.5"
+GTKEY="SUPER + T"
+gt_has_gpu() { [ -x "$1" ] && strings -n 8 "$1" 2>/dev/null | grep -qi librashader; }
+if [ ! -d "$GTSRC" ]; then
+  warn "GPU Terminal assets missing. |::| Skipping..."
+else
+  printf "[!] Install custom terminal to match theme? (y/N) "
+  read -r ans </dev/tty
+  if [ "$ans" != "y" ] && [ "$ans" != "Y" ]; then
+    warn "GPU Terminal not installed. |::| Skipping..."
+  else
+    GT_OK=0
+    if ! command -v cargo >/dev/null 2>&1; then
+      step "installing rust toolchain..."
+      sudo pacman -S --needed --noconfirm rust >/dev/null 2>&1 || true
+    fi
+    if ! command -v cargo >/dev/null 2>&1; then
+      err "rust toolchain unavailable."
+      warn "GPU Terminal not installed. |::| Skipping..."
+    else
+      gt_has_gpu "$GTBIN" && step "rebuilding GPU Terminal to match this theme..." || step "building GPU Terminal with GPU shader support..."
+      if cargo install rioterm --version "$GTVER" --force --locked --features wgpu; then
+        gt_has_gpu "$GTBIN" && GT_OK=1
+      fi
+      [ "$GT_OK" = 1 ] || { err "GPU shader build unavailable."; warn "GPU Terminal not installed. |::| Skipping..."; }
+    fi
+    if [ "$GT_OK" = 1 ]; then
+      step "deploying terminal theme and CRT shader..."
+      mkdir -p "$GTCFG/themes" "$GTCFG/shaders" "$HOME/.local/share/applications" "$HOME/.local/share/icons/hicolor/scalable/apps"
+      if [ -f "$GTCFG/config.toml" ] && [ ! -f "$GTCFG/config.toml.pre-cyberpunk" ]; then
+        cp "$GTCFG/config.toml" "$GTCFG/config.toml.pre-cyberpunk" && ok "previous terminal config backed up"
+      fi
+      cp "$GTSRC/config.toml" "$GTCFG/config.toml"
+      cp "$GTSRC/themes/"*.toml "$GTCFG/themes/"
+      rm -rf "$GTCFG/shaders/newpixie-flat"
+      cp -r "$GTSRC/shaders/newpixie-flat" "$GTCFG/shaders/"
+      sed -i "s|__RIO_SHADER__|$GTCFG/shaders/newpixie-flat|g" "$GTCFG/config.toml"
+      sed "s|__RIO_BIN__|$GTBIN|g" "$GTSRC/desktop/rio.desktop" > "$HOME/.local/share/applications/rio.desktop"
+      cp "$GTSRC/desktop/rio.svg" "$HOME/.local/share/icons/hicolor/scalable/apps/rio.svg"
+      update-desktop-database "$HOME/.local/share/applications" 2>/dev/null || true
+      gtk-update-icon-cache -f -t "$HOME/.local/share/icons/hicolor" 2>/dev/null || true
+      ok "Cyber Terminal installed |::| use $GTKEY to open the Terminal."
+    fi
+  fi
+fi
 
 hdr "ACTIVATE THEMING"
 [ -x "$THEME/scripts/apply_theme" ] && "$THEME/scripts/apply_theme" && ok "icon/cursor/kitty/kvantum theming applied" || warn "apply_theme not run"
@@ -643,6 +693,7 @@ printf "${GRN}${B}        ░▒▓  INSTALLED SUCCESSFULLY  ▓▒░${R}\n\n"
 printf "${GREY}${B}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${R}\n\n"
 printf "${YEL}${B}  ▸ KEYBINDS   |::|   ⧉ = SUPER + SHIFT${R}\n"
 printf "    ${CYAN}${B}SUPER + TAB   App launcher${R}\n"
+printf "    ${CYAN}${B}%-13s Cyber Terminal${R}\n" "$GTKEY"
 printf "    ${CYAN}${B}⧉ + T        Terminal${R}\n"
 printf "    ${CYAN}${B}⧉ + K        KILL MODE ${R}${GREY}(click a window to kill · ESC exits)${R}\n"
 printf "    ${CYAN}${B}⧉ + Z        Toggles HUD${R}\n"
@@ -652,6 +703,8 @@ printf "    ${CYAN}${B}⧉ + O        Music Player${R}\n"
 printf "    ${CYAN}${B}⧉ + C        CPU/RAM Monitor${R}\n"
 printf "    ${CYAN}${B}⧉ + L        Lock Screen${R}\n"
 printf "    ${CYAN}${B}⧉ + V        Volume${R}\n"
+printf "    ${CYAN}${B}⧉ + W        Weather Forecast ${R}${GREY}(7-day panel · double-click city to change)${R}\n"
+printf "    ${CYAN}${B}⧉ + -        System Time ${R}${GREY}(timezone · NTP · manual set)${R}\n"
 printf "    ${CYAN}${B}⧉ + H        Help Menu ${R}${GREY}(List all theme keybinds)${R}\n"
 printf " "
 

@@ -1,0 +1,22 @@
+[Desktop Entry]
+Type=Application
+Version=1.5
+Name=Rio
+GenericName=Terminal Emulator
+Comment=Hardware-accelerated GPU terminal emulator
+Keywords=shell;prompt;command;commandline;cmd;terminal;rio;
+Exec=__RIO_BIN__ --app-id rio
+Icon=rio
+Terminal=false
+Categories=System;TerminalEmulator;
+StartupNotify=true
+StartupWMClass=rio
+Actions=NewWindow;Htop;
+
+[Desktop Action NewWindow]
+Name=New Window
+Exec=__RIO_BIN__ --app-id rio
+
+[Desktop Action Htop]
+Name=Open htop
+Exec=__RIO_BIN__ --app-id rio -e htop

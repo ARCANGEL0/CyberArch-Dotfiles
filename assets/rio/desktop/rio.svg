@@ -1,0 +1,56 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="128" height="128">
+  <defs>
+    <linearGradient id="bezel" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#121a26"/>
+      <stop offset="1" stop-color="#070c14"/>
+    </linearGradient>
+    <linearGradient id="phosphor" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#63c0d2"/>
+      <stop offset="0.55" stop-color="#5b9bc9"/>
+      <stop offset="1" stop-color="#e0a860"/>
+    </linearGradient>
+    <radialGradient id="screenglow" cx="0.5" cy="0.45" r="0.75">
+      <stop offset="0" stop-color="#63c0d2" stop-opacity="0.30"/>
+      <stop offset="0.6" stop-color="#3c6786" stop-opacity="0.10"/>
+      <stop offset="1" stop-color="#000000" stop-opacity="0"/>
+    </radialGradient>
+    <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="2.4" result="b"/>
+      <feMerge>
+        <feMergeNode in="b"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+    <clipPath id="screenclip">
+      <rect x="14" y="18" width="100" height="78" rx="14"/>
+    </clipPath>
+  </defs>
+
+  <!-- outer bezel -->
+  <rect x="8" y="12" width="112" height="90" rx="20" fill="url(#bezel)" stroke="#63c0d2" stroke-opacity="0.55" stroke-width="2"/>
+
+  <!-- screen -->
+  <rect x="14" y="18" width="100" height="78" rx="14" fill="#070c14"/>
+  <rect x="14" y="18" width="100" height="78" rx="14" fill="url(#screenglow)"/>
+
+  <g clip-path="url(#screenclip)">
+    <!-- scanlines -->
+    <g stroke="#63c0d2" stroke-opacity="0.13" stroke-width="1">
+      <path d="M14 24h100M14 30h100M14 36h100M14 42h100M14 48h100M14 54h100M14 60h100M14 66h100M14 72h100M14 78h100M14 84h100M14 90h100"/>
+    </g>
+    <!-- chromatic aberration ghosts -->
+    <g filter="url(#glow)" opacity="0.35">
+      <path d="M34 46l14 12-14 12" fill="none" stroke="#e0a860" stroke-width="7" stroke-linecap="round" stroke-linejoin="round" transform="translate(-2.5,0)"/>
+      <path d="M34 46l14 12-14 12" fill="none" stroke="#63c0d2" stroke-width="7" stroke-linecap="round" stroke-linejoin="round" transform="translate(2.5,0)"/>
+    </g>
+    <!-- prompt chevron + caret -->
+    <g filter="url(#glow)">
+      <path d="M34 46l14 12-14 12" fill="none" stroke="url(#phosphor)" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/>
+      <rect x="58" y="64" width="30" height="7" rx="3.5" fill="#63c0d2"/>
+    </g>
+  </g>
+
+  <!-- stand -->
+  <path d="M52 102h24l4 12H48z" fill="url(#bezel)" stroke="#63c0d2" stroke-opacity="0.45" stroke-width="2" stroke-linejoin="round"/>
+  <rect x="38" y="112" width="52" height="7" rx="3.5" fill="#0e1620" stroke="#e0a860" stroke-opacity="0.55" stroke-width="2"/>
+</svg>
