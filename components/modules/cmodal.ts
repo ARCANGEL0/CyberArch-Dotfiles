@@ -132,11 +132,11 @@ export const createModal = (spec) => {
     const col = spec.col || (spec.hud ? HUDRED : CYAN), accent = spec.accent || (spec.hud ? HUDRED : ACC)
     const yaw = spec.yaw ?? 0, pitch = spec.pitch ?? 0, roll = spec.roll ?? 0
     const plane = (yaw || pitch || roll)
-        ? makePlane({ w: W, h: H, yaw, pitch, roll, focal: 1000, dist: 1000, pad: 30 })
+        ? makePlane({ w: W, h: H, yaw, pitch, roll, focal: spec.focal ?? 1000, dist: spec.dist ?? 1000, pad: 30 })
         : makeModalPlane(W, H)
     let surf: any = null, sctx: any = null, win: any = null, area: any = null
     let visible = false, intro = 0, introTarget = 0, seed = 0
-    let animT: any = null, pollT: any = null
+    let animT: any = null, pollT: any = null, lastFrame = 0
     let hitRegions: any[] = [], drag: any = null, hoverKey: any = null
     const ctrl: any = { name }
 
@@ -146,7 +146,7 @@ export const createModal = (spec) => {
         setTxtFX(spec.hud)
         if (spec.hud) { drawHudFrame(ctx, X, Y, w, h, tabTitle) }
         else if (!spec.noGlass) {
-            drawGlass(ctx, X, Y, w, h, col)
+            drawGlass(ctx, X, Y, w, h, col, spec.glass ?? 1)
             txt(ctx, X + 24, Y + 27, tabTitle, TITLE, 15, accent, 0.98, 1, 0.45)
             ctx.setSourceRGBA(col[0], col[1], col[2], 0.32); ctx.setLineWidth(1); ctx.newPath(); ctx.moveTo(X + 14, Y + HEADER); ctx.lineTo(X + w - 14, Y + HEADER); ctx.stroke()
         }
@@ -170,14 +170,36 @@ export const createModal = (spec) => {
             const sp = introTarget > intro ? 0.2 : 0.26
             if (Math.abs(introTarget - intro) <= sp) intro = introTarget; else intro += Math.sign(introTarget - intro) * sp
             if (introTarget === 0 && intro <= 0.001) { intro = 0; if (win) win.visible = false; stopTimers() }
-            area && area.queue_draw()
+            const idleMs = spec.idleFrameMs ?? 0
+            const now = Date.now()
+            if (intro !== introTarget || idleMs <= 0 || now - lastFrame >= idleMs) { lastFrame = now; area && area.queue_draw() }
         })
         if (spec.poll && !pollT) pollT = interval(spec.pollMs || 1500, spec.poll)
     }
     const stopTimers = () => { if (animT) { animT.cancel(); animT = null } if (pollT) { pollT.cancel(); pollT = null } }
 
-    ctrl.open = () => { if (visible) return; visible = true; introTarget = 1; try { win.gdkmonitor = activeMonitor() } catch {} spec.onOpen?.(); win.visible = true; try { win.present?.() } catch {} startTimers(); area && area.queue_draw(); fireChange() }
-    ctrl.close = () => { if (!visible && introTarget === 0) return; visible = false; introTarget = 0; spec.onClose?.(); fireChange(); startTimers() }
+    const shapeInput = () => {
+        try {
+            const gw = win?.get_window?.(); if (!gw) return
+            const reg = new Cairo.Region()
+            if (visible) {
+                const steps = 56
+                for (let i = 0; i < steps; i++) {
+                    const v0 = (i / steps) * H, v1 = ((i + 1) / steps) * H
+                    const a0 = plane.project(0, v0), a1 = plane.project(W, v0)
+                    const b0 = plane.project(0, v1), b1 = plane.project(W, v1)
+                    const x0 = Math.floor(Math.min(a0[0], b0[0])) - 3
+                    const x1 = Math.ceil(Math.max(a1[0], b1[0])) + 3
+                    const y0 = Math.floor(Math.min(a0[1], a1[1])) - 1
+                    const y1 = Math.ceil(Math.max(b0[1], b1[1])) + 1
+                    reg.unionRectangle({ x: x0, y: y0, width: Math.max(1, x1 - x0), height: Math.max(1, y1 - y0) })
+                }
+            }
+            gw.input_shape_combine_region(reg, 0, 0)
+        } catch (e) { print("[cyber] modal input shape:", e) }
+    }
+    ctrl.open = () => { if (visible) return; visible = true; introTarget = 1; try { win.gdkmonitor = activeMonitor() } catch {} spec.onOpen?.(); win.visible = true; try { win.present?.() } catch {} startTimers(); area && area.queue_draw(); timeout(40, shapeInput); fireChange() }
+    ctrl.close = () => { if (!visible && introTarget === 0) return; visible = false; introTarget = 0; shapeInput(); spec.onClose?.(); fireChange(); startTimers() }
     ctrl.toggle = () => visible ? ctrl.close() : ctrl.open()
     ctrl.isOpen = () => visible
     ctrl.requestDraw = () => area && area.queue_draw()
@@ -224,8 +246,9 @@ export const createModal = (spec) => {
     })
     const onKeyPress = (_w, e) => { let k = 0; try { const r = e.get_keyval?.(); k = r ? r[1] : e.keyval } catch {} if (k === Gdk.KEY_Escape) ctrl.close(); else spec.onKey?.(k); return true }
 
-    const winOpts: any = { name: `modal_${name}`, className: "aug modal", layer: Layer.OVERLAY, exclusivity: Exclusivity.IGNORE, keymode: spec.keymode ?? Keymode.EXCLUSIVE, visible: false, child: evt }
+    const winOpts: any = { name: `modal_${name}`, namespace: `modal_${name}`, className: "aug modal", layer: Layer.OVERLAY, exclusivity: Exclusivity.IGNORE, keymode: spec.keymode ?? Keymode.EXCLUSIVE, visible: false, child: evt }
     if (spec.anchorRight) { winOpts.anchor = Anchor.RIGHT; winOpts.margin_right = Math.round(SCREEN_WIDTH * 0.25) }
+    else if (spec.anchorLeft) { winOpts.anchor = Anchor.LEFT; winOpts.margin_left = spec.marginLeft ?? Math.round(SCREEN_WIDTH * 0.03) }
     win = Window(winOpts)
     win.connect("key-press-event", onKeyPress)
     ctrl.win = win
@@ -647,13 +670,202 @@ const BatCtrl = () => {
     return ctrl
 }
 
+const SYSY: [number, number, number] = [252 / 255, 238 / 255, 10 / 255]
+const SYSC: [number, number, number] = [94 / 255, 244 / 255, 248 / 255]
+const SYSR: [number, number, number] = [255 / 255, 42 / 255, 58 / 255]
+const SYS_LOCK = "/tmp/cyber-sysmon.lock"
+const SYS_AUDIO = `${CYBER_DIR}/assets/audio`
+const sysPlay = (f, vol, mvol) => sh(`setsid -f sh -c "play -q -v ${vol} '${SYS_AUDIO}/${f}' 2>/dev/null || mpv --no-video --really-quiet --volume=${mvol} '${SYS_AUDIO}/${f}' 2>/dev/null" >/dev/null 2>&1`)
+const sysSndOn = () => {
+    sysPlay("kiroshi_on.ogg", "1.2", "120")
+    sh(`touch ${SYS_LOCK}; setsid -f sh -c "while [ -e '${SYS_LOCK}' ]; do play -q -v 0.9 '${SYS_AUDIO}/kiroshi_menu.ogg' 2>/dev/null || { mpv --no-video --really-quiet --volume=90 '${SYS_AUDIO}/kiroshi_menu.ogg' 2>/dev/null || break; }; done" >/dev/null 2>&1`)
+}
+const sysSndOff = () => {
+    sh(`rm -f ${SYS_LOCK}`)
+    sysPlay("kiroshi_off.ogg", "1.2", "120")
+}
+const bevel = (ctx, x, y, w, h, c = 10) => {
+    ctx.newPath()
+    ctx.moveTo(x, y); ctx.lineTo(x + w - c, y); ctx.lineTo(x + w, y + c)
+    ctx.lineTo(x + w, y + h); ctx.lineTo(x + c, y + h); ctx.lineTo(x, y + h - c); ctx.closePath()
+}
+const SYSDIM: [number, number, number] = [0.62, 0.72, 0.75]
+const SEGOFF: [number, number, number] = [0.34, 0.40, 0.42]
+const rdf = (f) => { try { const [ok, b2] = GLib.file_get_contents(f); return ok ? new TextDecoder().decode(b2) : "" } catch { return "" } }
+const kbToG = (kb) => kb / 1048576
+const cpuSnap = () => {
+    const out: any = { total: [], idle: [] }
+    for (const line of rdf("/proc/stat").split("\n")) {
+        if (!/^cpu/.test(line)) continue
+        const f = line.trim().split(/\s+/)
+        const n = f.slice(1, 9).map(Number)
+        if (n.length < 4 || isNaN(n[0])) continue
+        out.total.push(n.reduce((a2, b2) => a2 + (b2 || 0), 0))
+        out.idle.push((n[3] || 0) + (n[4] || 0))
+    }
+    return out
+}
+const netSnap = () => {
+    let rx = 0, tx = 0
+    for (const line of rdf("/proc/net/dev").split("\n").slice(2)) {
+        const i = line.indexOf(":"); if (i < 0) continue
+        const name = line.slice(0, i).trim(); if (name === "lo") continue
+        const f = line.slice(i + 1).trim().split(/\s+/).map(Number)
+        rx += f[0] || 0; tx += f[8] || 0
+    }
+    return { rx, tx, t: GLib.get_monotonic_time() }
+}
+const cpuTemp = () => {
+    for (const z of ["thermal_zone0", "thermal_zone1", "thermal_zone2", "thermal_zone3"]) {
+        const v = parseInt(rdf(`/sys/class/thermal/${z}/temp`).trim())
+        if (v > 1000 && v < 150000) return Math.round(v / 1000)
+    }
+    return 0
+}
+const cpuMHz = () => {
+    const v = parseInt(rdf("/sys/devices/system/cpu/cpu0/cpufreq/scaling_cur_freq").trim())
+    if (v > 0) return Math.round(v / 1000)
+    const m = rdf("/proc/cpuinfo").match(/cpu MHz\s*:\s*([\d.]+)/)
+    return m ? Math.round(parseFloat(m[1])) : 0
+}
+const fmtUp = (secs) => {
+    const d = Math.floor(secs / 86400), h = Math.floor((secs % 86400) / 3600), m = Math.floor((secs % 3600) / 60)
+    return d > 0 ? `${d}d ${h}h ${m}m` : `${h}h ${m}m`
+}
+const mbps = (bps) => { const m = bps * 8 / 1e6; return m >= 100 ? m.toFixed(0) : m.toFixed(1) }
+const TICKS = ["XC", "XT", "BR", "XY", "CD"]
+
+const ladder = (ctx, x, y, w, h, frac, col, icon, label, valTxt, side) => {
+    const segH = 5, gap = 5, step = segH + gap
+    const track = h - 40
+    const segs = Math.floor(track / step)
+    const f = Math.max(0, Math.min(1, frac))
+    const mi = Math.round((1 - f) * (segs - 1))
+    const left = side === "l"
+
+    ctx.setSourceRGBA(SYSDIM[0], SYSDIM[1], SYSDIM[2], 0.22); ctx.setLineWidth(1)
+    for (const gx of [x - 16, x + w + 16]) {
+        ctx.newPath(); ctx.moveTo(gx, y - 10); ctx.lineTo(gx, y + track + 10); ctx.stroke()
+    }
+    TICKS.forEach((t, i) => {
+        const ty = y + 6 + (i / (TICKS.length - 1)) * (track - 16)
+        ctx.selectFontFace(MONO, 0, 0); ctx.setFontSize(8)
+        txt(ctx, x - 22 - ctx.textExtents(t).width, ty, t, MONO, 8, SYSDIM, 0.4)
+        txt(ctx, x + w + 22, ty, TICKS[(i + 2) % TICKS.length], MONO, 8, SYSDIM, 0.4)
+    })
+
+    const tt = Date.now() / 320
+    const EXT = [
+        (58 + 92 * f) * (1 + 0.05 * Math.sin(tt)),
+        (38 + 58 * f) * (1 + 0.07 * Math.sin(tt + 1.1)),
+        (22 + 34 * f) * (1 + 0.09 * Math.sin(tt + 2.2)),
+    ]
+    for (let i = 0; i < segs; i++) {
+        const sy = y + i * step
+        const k = mi - i
+        const ext = (k >= 0 && k < EXT.length) ? EXT[k] : 0
+        const marked = ext > 0
+        const filled = i > mi
+        const sx = left ? x - ext : x
+        const c: any = (marked || filled) ? col : SEGOFF
+        ctx.setSourceRGBA(c[0], c[1], c[2], marked ? 0.98 : (filled ? 0.72 : 0.5))
+        ctx.rectangle(sx, sy, w + ext, segH); ctx.fill()
+    }
+
+    ctx.selectFontFace(ICONF, 0, 0); ctx.setFontSize(13)
+    txt(ctx, x + w / 2 - ctx.textExtents(icon).width / 2, y - 20, icon, ICONF, 13, col, 0.9)
+
+    const cw2 = 54, chY = y + mi * step - 9
+    const cx2 = left ? x - EXT[0] - cw2 - 6 : x + w + EXT[0] + 6
+    ctx.setSourceRGBA(col[0], col[1], col[2], 0.95)
+    ctx.rectangle(cx2, chY, cw2, 22); ctx.fill()
+    ctx.selectFontFace(TITLE, 0, 1); ctx.setFontSize(15)
+    txt(ctx, cx2 + cw2 / 2 - ctx.textExtents(valTxt).width / 2, chY + 17, valTxt, TITLE, 15, [0.03, 0.05, 0.06], 1, 1)
+
+    ctx.selectFontFace(MONO, 0, 1); ctx.setFontSize(9)
+    txt(ctx, x + w / 2 - ctx.textExtents(label).width / 2, y + track + 26, label, MONO, 9, col, 0.85, 1)
+}
+
+const slotSq = (ctx, x, y, w, h, label, val, frac, col, hot) => {
+    const c: any = hot ? SYSR : col
+    bevel(ctx, x, y, w, h, 10)
+    ctx.setSourceRGBA(c[0] * 0.16, c[1] * 0.16, c[2] * 0.18, 0.30); ctx.fill()
+    bevel(ctx, x, y, w, h, 10)
+    ctx.setSourceRGBA(c[0], c[1], c[2], hot ? 0.95 : 0.6); ctx.setLineWidth(1.1); ctx.stroke()
+    bevel(ctx, x + 6, y + 6, w - 12, h - 12, 6)
+    ctx.setSourceRGBA(c[0], c[1], c[2], 0.14); ctx.setLineWidth(0.8); ctx.stroke()
+    txt(ctx, x + 10, y + 18, label, MONO, 9.5, c, 0.95, 1)
+    ctx.selectFontFace(TITLE, 0, 1); ctx.setFontSize(17)
+    txt(ctx, x + 10, y + 40, val, TITLE, 17, c, 0.97, 1)
+    if (frac >= 0) {
+        const bh = h - 22
+        ctx.setSourceRGBA(c[0], c[1], c[2], 0.14)
+        ctx.rectangle(x + w - 14, y + 11, 5, bh); ctx.fill()
+        ctx.setSourceRGBA(c[0], c[1], c[2], 0.92)
+        const fh = bh * Math.max(0, Math.min(1, frac))
+        ctx.rectangle(x + w - 14, y + 11 + bh - fh, 5, fh); ctx.fill()
+    }
+}
+const groupLabel = (ctx, x, y, s) => txt(ctx, x, y, s, MONO, 9.5, SYSR, 0.85, 1)
+
 const SysCtrl = () => {
-    const st: any = { cpu: 0, memU: 0, memT: 1, procs: [], sel: "", selProc: null, scroll: 0, cpuHist: [], ramHist: [] }
+    const st: any = {
+        cpu: 0, cores: [], cpuHist: [], memU: 0, memT: 1, memCache: 0, swapU: 0, swapT: 0, ramHist: [],
+        up: "0.0", down: "0.0", upHist: [], downHist: [], temp: 0, mhz: 0, load: "—", uptime: "—",
+        disks: [], procs: [], sel: "", selProc: null, scroll: 0, prevCpu: null, prevNet: null, aCpu: 0, aMem: 0,
+    }
     let ctrl
+    const sample = () => {
+        const c = cpuSnap()
+        if (st.prevCpu && st.prevCpu.total.length === c.total.length) {
+            const pct: number[] = []
+            for (let i = 0; i < c.total.length; i++) {
+                const dt = c.total[i] - st.prevCpu.total[i], di = c.idle[i] - st.prevCpu.idle[i]
+                pct.push(dt > 0 ? Math.max(0, Math.min(100, Math.round(100 * (dt - di) / dt))) : 0)
+            }
+            st.cpu = pct[0] ?? 0
+            st.cores = pct.slice(1)
+            st.cpuHist.push(st.cpu); if (st.cpuHist.length > 60) st.cpuHist.shift()
+        }
+        st.prevCpu = c
+
+        const mi: any = {}
+        for (const line of rdf("/proc/meminfo").split("\n")) {
+            const m = line.match(/^(\w+):\s+(\d+)/); if (m) mi[m[1]] = parseInt(m[2])
+        }
+        st.memT = mi.MemTotal || 1
+        st.memU = st.memT - (mi.MemAvailable ?? st.memT)
+        st.memCache = (mi.Cached || 0) + (mi.Buffers || 0)
+        st.swapT = mi.SwapTotal || 0
+        st.swapU = st.swapT - (mi.SwapFree || 0)
+        st.ramHist.push(100 * st.memU / st.memT); if (st.ramHist.length > 60) st.ramHist.shift()
+
+        const n = netSnap()
+        if (st.prevNet) {
+            const dt = Math.max(1e-6, (n.t - st.prevNet.t) / 1e6)
+            const d = Math.max(0, (n.rx - st.prevNet.rx) / dt), u = Math.max(0, (n.tx - st.prevNet.tx) / dt)
+            st.down = mbps(d); st.up = mbps(u)
+            st.downHist.push(d * 8 / 1e6); if (st.downHist.length > 40) st.downHist.shift()
+            st.upHist.push(u * 8 / 1e6); if (st.upHist.length > 40) st.upHist.shift()
+        }
+        st.prevNet = n
+
+        st.temp = cpuTemp(); st.mhz = cpuMHz()
+        st.load = rdf("/proc/loadavg").trim().split(/\s+/).slice(0, 3).join("  ") || "—"
+        st.uptime = fmtUp(parseFloat(rdf("/proc/uptime").split(" ")[0]) || 0)
+        ctrl.requestDraw()
+    }
+    const refreshDisks = () => sh("df -B1 --output=source,target,size,used -x tmpfs -x devtmpfs -x efivarfs -x squashfs -x overlay 2>/dev/null | tail -n +2 | awk '$3>0 && !seen[$1]++ {print $2, $3, $4}' | head -4").then((o) => {
+        st.disks = o.trim().split("\n").filter(Boolean).map((l) => {
+            const f = l.trim().split(/\s+/)
+            const size = Number(f[1]), used = Number(f[2])
+            return { mount: f[0], frac: size > 0 ? used / size : 0, used: used / 1e9, size: size / 1e9 }
+        })
+        ctrl.requestDraw()
+    })
     const refresh = () => {
-        sh("read -r _ a b c d e f h r < /proc/stat; i1=$d; t1=$((a+b+c+d+e+f+h)); sleep 0.25; read -r _ a b c d e f h r < /proc/stat; i2=$d; t2=$((a+b+c+d+e+f+h)); dt=$((t2-t1)); di=$((i2-i1)); echo $(( dt>0 ? 100*(dt-di)/dt : 0 ))").then((o) => { st.cpu = parseInt(o.trim()) || 0; st.cpuHist.push(st.cpu); if (st.cpuHist.length > 60) st.cpuHist.shift(); ctrl.requestDraw() })
-        sh("free -m | awk '/^Mem:/{print $3, $2}'").then((o) => { const [u, t] = o.trim().split(/\s+/).map(Number); st.memU = u || 0; st.memT = t || 1; st.ramHist.push(100 * st.memU / st.memT); if (st.ramHist.length > 60) st.ramHist.shift(); ctrl.requestDraw() })
-        sh("ps -eo pid,comm,%cpu,%mem --sort=-%cpu --no-headers 2>/dev/null | head -16").then((o) => {
+        sample()
+        sh("ps -eo pid,comm,%cpu,%mem --sort=-%cpu --no-headers 2>/dev/null | head -20").then((o) => {
             st.procs = o.trim().split("\n").filter(Boolean).map((l) => { const p = l.trim().split(/\s+/); return { pid: p[0], name: p.slice(1, p.length - 2).join(" "), cpu: Math.round(parseFloat(p[p.length - 2]) / NCORES), mem: Math.round(parseFloat(p[p.length - 1])) } })
             ctrl.requestDraw()
         })
@@ -666,41 +878,120 @@ const SysCtrl = () => {
     const select = (p) => { st.sel = p.pid; st.selProc = p; st.scroll = 0; ctrl.requestDraw() }
     const killSel = () => { if (st.sel) sh(`kill -9 ${st.sel} 2>/dev/null`).then(() => { st.sel = ""; st.selProc = null; timeout(400, refresh) }) }
     ctrl = createModal({
-        name: "sys", tabTitle: "SYSTEM MONITOR", W: 430, H: 432, hud: true,
-        onOpen: () => { st.sel = ""; st.selProc = null; st.scroll = 0; st.cpuHist = []; st.ramHist = []; startModalStats(); refresh() },
-        onClose: () => stopModalStats(),
-        poll: refresh, pollMs: 1500,
+        name: "sys", tabTitle: "SYSTEM MONITOR", W: SCREEN_WIDTH, H: SCREEN_HEIGHT, noGlass: true,
+        idleFrameMs: 70,
+        onFrame: () => {
+            const tc = st.cpu / 100, tm = st.memU / st.memT
+            st.aCpu += (tc - st.aCpu) * 0.16
+            st.aMem += (tm - st.aMem) * 0.16
+        },
+        onOpen: () => {
+            st.sel = ""; st.selProc = null; st.scroll = 0; st.cpuHist = []; st.ramHist = []
+            st.upHist = []; st.downHist = []; st.prevCpu = null; st.prevNet = null
+            startModalStats(); sample(); refresh(); refreshDisks(); sysSndOn()
+        },
+        onClose: () => { stopModalStats(); sysSndOff() },
+        poll: refresh, pollMs: 900,
         onScroll: (d) => { st.scroll = Math.max(0, Math.min(Math.max(0, st.procs.length - 1), st.scroll + d)); ctrl.requestDraw() },
         draw: (ctx, g) => {
-            const x = g.X + 20, w = g.w - 40, top = g.Y + HEADER + 14, gw = (w - 14) / 2, gH = 50, BR = rcAcc()
-            txt(ctx, x, top + 2, "CPU", MONO, 9, g.col, 0.6)
-            ctx.selectFontFace(MONO, 0, 0); ctx.setFontSize(12); let v = `${st.cpu}%`
-            txt(ctx, x + gw - ctx.textExtents(v).width, top + 2, v, MONO, 12, BR, 0.96)
-            drawGraph(ctx, x, top + 8, gw, gH, st.cpuHist, 100, BR)
-            const rx = x + gw + 14
-            txt(ctx, rx, top + 2, "MEMORY", MONO, 9, g.col, 0.6)
-            v = `${(st.memU / 1024).toFixed(1)}/${(st.memT / 1024).toFixed(1)}G`; ctx.selectFontFace(MONO, 0, 0); ctx.setFontSize(10)
-            txt(ctx, rx + gw - ctx.textExtents(v).width, top + 2, v, MONO, 10, g.col, 0.92)
-            drawGraph(ctx, rx, top + 8, gw, gH, st.ramHist, 100, g.col)
-            const ky = top + gH + 32
-            drawBtn(ctx, g.push, x + w - 124, ky - 18, 124, 24, st.sel ? "FORCE KILL" : "SELECT A PROC", killSel, !!st.sel, g.col, st.sel ? ch(0xf011) : "")
-            txt(ctx, x, ky, "// TOP PROCESSES", MONO, 9, g.col, 0.82)
-            const ly = ky + 8, lh = (g.Y + g.h - 44) - ly
+            const X = g.X, Y = g.Y, W = g.w, H = g.h
+            const memF = st.memU / st.memT
+
+            ctx.setSourceRGBA(0.015, 0.02, 0.03, 0.42); ctx.rectangle(X, Y, W, H); ctx.fill()
+            const pulse = 0.94 + 0.06 * Math.sin(Date.now() / 500)
+            const vcx = X + W / 2, vcy = Y + H / 2, reach = Math.hypot(W, H) / 2
+            const vg = new Cairo.RadialGradient(vcx, vcy, reach * 0.16, vcx, vcy, reach * 0.98)
+            vg.addColorStopRGBA(0, 0.02, 0, 0.01, 0.46)
+            vg.addColorStopRGBA(0.5, 0.06, 0, 0.01, 0.68)
+            vg.addColorStopRGBA(1, 0.19, 0, 0.03, 0.92 * pulse)
+            ctx.setSource(vg); ctx.rectangle(X, Y, W, H); ctx.fill()
+
+            const hy = Y + 40
+            ctx.setSourceRGBA(SYSR[0], SYSR[1], SYSR[2], 0.55); ctx.setLineWidth(1)
+            ctx.newPath(); ctx.moveTo(X + 40, hy + 26); ctx.lineTo(X + W - 40, hy + 26); ctx.stroke()
+            const pair = (px, num, lab, col) => {
+                ctx.selectFontFace(TITLE, 0, 1); ctx.setFontSize(23)
+                txt(ctx, px, hy + 18, num, TITLE, 23, col, 0.98, 1, 0.4)
+                const nw = ctx.textExtents(num).width
+                txt(ctx, px + nw + 8, hy + 18, lab, TITLE, 12, col, 0.8, 1)
+                for (let i = 0; i < 6; i++) {
+                    ctx.setSourceRGBA(col[0], col[1], col[2], i < 3 ? 0.8 : 0.25)
+                    ctx.rectangle(px + i * 9, hy + 30, i < 3 ? 7 : 3, 2); ctx.fill()
+                }
+                return px + nw + 14 + ctx.textExtents(lab).width
+            }
+            let hx = X + 46
+            hx = pair(hx, `${st.cpu}`, "CPU", SYSY) + 34
+            hx = pair(hx, `${Math.round(memF * 100)}`, "MEM", SYSC) + 34
+            const tabs = ["CORE ARRAY", "MEMORY", "NETWORK", "STORAGE", "PROCESSES"]
+            ctx.selectFontFace(TITLE, 0, 1); ctx.setFontSize(13)
+            let tw2 = tabs.reduce((a2, t) => a2 + ctx.textExtents(t).width + 30, 0)
+            let tx3 = X + W / 2 - tw2 / 2
+            tabs.forEach((t, i) => {
+                const w2 = ctx.textExtents(t).width
+                txt(ctx, tx3, hy + 16, t, TITLE, 13, i === 0 ? SYSC : SYSR, i === 0 ? 0.98 : 0.72, 1)
+                if (i === 0) { ctx.setSourceRGBA(SYSC[0], SYSC[1], SYSC[2], 0.95); ctx.rectangle(tx3, hy + 23, w2, 2); ctx.fill() }
+                tx3 += w2 + 30
+            })
+            const rt = `${st.temp ? st.temp + "°C" : "—"}    ${st.mhz ? (st.mhz / 1000).toFixed(2) + "GHz" : "—"}    ${kbToG(st.memU).toFixed(1)}/${kbToG(st.memT).toFixed(1)}G`
+            ctx.selectFontFace(TITLE, 0, 1); ctx.setFontSize(15)
+            txt(ctx, X + W - ctx.textExtents(rt).width - 46, hy + 18, rt, TITLE, 15, SYSY, 0.92, 1)
+            ctx.selectFontFace(MONO, 0, 0); ctx.setFontSize(9)
+            const lt = `UP ${st.uptime}   LOAD ${st.load}`
+            txt(ctx, X + W - ctx.textExtents(lt).width - 46, hy + 40, lt, MONO, 9, SYSDIM, 0.6)
+
+            const gTop = Y + 190, gH = H - 400
+            ladder(ctx, X + 70, gTop, 30, gH, st.aCpu, SYSY, ch(0xf2db), "CPU", `${st.cpu}`, "r")
+            ladder(ctx, X + W - 100, gTop, 30, gH, st.aMem, SYSC, ch(0xf538), "MEM", `${Math.round(memF * 100)}`, "l")
+
+            const mx = X + 350, mw = W - 700
+            let cy3 = Y + 150
+
+            groupLabel(ctx, mx, cy3, "// CORE ARRAY")
+            const ncols = Math.max(1, st.cores.length)
+            const sw3 = Math.min(120, (mw - (ncols - 1) * 14) / ncols), sgw = ncols * sw3 + (ncols - 1) * 14
+            st.cores.forEach((v, i) => {
+                slotSq(ctx, mx + (mw - sgw) / 2 + i * (sw3 + 14), cy3 + 10, sw3, 62, `C${i}`, `${v}%`, v / 100, SYSY, v > 85)
+            })
+
+            cy3 += 92
+            groupLabel(ctx, mx, cy3, "// MEMORY")
+            const m3 = (mw / 2 - 40 - 28) / 3
+            slotSq(ctx, mx, cy3 + 10, m3, 62, "USED", `${kbToG(st.memU).toFixed(1)}G`, memF, SYSC, false)
+            slotSq(ctx, mx + m3 + 14, cy3 + 10, m3, 62, "CACHE", `${kbToG(st.memCache).toFixed(1)}G`, st.memCache / st.memT, SYSC, false)
+            slotSq(ctx, mx + (m3 + 14) * 2, cy3 + 10, m3, 62, "SWAP", st.swapT ? `${kbToG(st.swapU).toFixed(1)}G` : "—", st.swapT ? st.swapU / st.swapT : 0, SYSC, false)
+
+            const nx = mx + mw / 2 + 20
+            groupLabel(ctx, nx, cy3, "// NETWORK")
+            const n2 = (mw / 2 - 20 - 14) / 2
+            slotSq(ctx, nx, cy3 + 10, n2, 62, "UPLINK", `${st.up}`, -1, SYSY, false)
+            slotSq(ctx, nx + n2 + 14, cy3 + 10, n2, 62, "DOWNLINK", `${st.down}`, -1, SYSC, false)
+            drawGraph(ctx, nx, cy3 + 78, n2, 44, st.upHist, Math.max(1, ...st.upHist), SYSY)
+            drawGraph(ctx, nx + n2 + 14, cy3 + 78, n2, 44, st.downHist, Math.max(1, ...st.downHist), SYSC)
+
+            groupLabel(ctx, mx, cy3 + 92, "// STORAGE")
+            st.disks.slice(0, 2).forEach((d, i) => {
+                slotSq(ctx, mx + i * (m3 + 14), cy3 + 102, m3, 44, d.mount.slice(0, 10), `${Math.round(d.frac * 100)}%`, d.frac, d.frac > 0.9 ? SYSR : SYSC, d.frac > 0.9)
+            })
+
+            const py = cy3 + 172
+            groupLabel(ctx, mx, py, "// PROCESSES")
+            drawBtn(ctx, g.push, mx + mw - 150, py - 16, 150, 26, st.sel ? "FORCE KILL" : "SELECT A PROC", killSel, !!st.sel, SYSR, st.sel ? ch(0xf011) : "")
+            const ly = py + 14, lh = (Y + H) - ly - 46
             const pinned = st.sel ? (st.selProc || st.procs.find((p) => p.pid === st.sel)) : null
             const rest = pinned ? st.procs.filter((p) => p.pid !== st.sel) : st.procs
-            drawProcList(ctx, g.push, x, ly, w, lh, rest, st.scroll, st.sel, pinned,
-                select, (p) => { select(p); killSel() })
+            drawProcList(ctx, g.push, mx, ly, mw, lh, rest, st.scroll, st.sel, pinned, select, (p) => { select(p); killSel() })
+            txt(ctx, X + 46, Y + H - 22, "SCROLL processes · CLICK to select · RIGHT-CLICK kills · ESC closes", MONO, 9, SYSDIM, 0.5)
         },
     })
     return ctrl
 }
-
 const KEYBINDS = [
     ["SUPER + TAB", "APP LAUNCHER"], ["H", "HELP MENU"], ["Z", "HUD OVERLAY"], ["V", "VOLUME"],
     ["I", "BRIGHTNESS"], ["U", "SYSTEM UPGRADE"], ["J", "DISMISS UPDATE"], ["M", "MICROPHONE"], ["O", "MUSIC PLAYER"], ["N", "NETWORKS"],
-    ["B", "BLUETOOTH"], ["W", "WEATHER"], ["P", "POWER MENU"], ["Y", "BATTERY"],
+    ["B", "BLUETOOTH"], ["W", "FORECAST"], ["P", "POWER MENU"], ["Y", "BATTERY"],
     ["C", "CPU / RAM"], ["L", "LOCKSCREEN"], ["R", "SCREEN RECORD"], ["S", "SCREENSHOT"],
-    ["T", "TERMINAL"], ["K", "KILL MODE"],
+    ["T", "TERMINAL"], ["K", "KILL MODE"], ["-", "TIME / TIMEZONE"],
 ]
 const drawKeyCap = (ctx, x, y, label, h) => {
     ctx.selectFontFace(TITLE, 0, 1); ctx.setFontSize(11); const tw = ctx.textExtents(label).width
@@ -721,6 +1012,13 @@ const HYPRBINDS = [
 ]
 const readThemeMod = () => {
     try {
+        const [ok, bytes] = GLib.file_get_contents(`${CYBER_DIR}/theme.lua`)
+        if (ok) {
+            const m = new TextDecoder().decode(bytes).match(/^\s*local\s+themeMod\s*=\s*"([^"]+)"/m)
+            if (m) return m[1].trim().replace(/\s*\+\s*/g, " + ")
+        }
+    } catch { }
+    try {
         const [ok, bytes] = GLib.file_get_contents(`${CYBER_DIR}/theme.conf`)
         if (ok) {
             const m = new TextDecoder().decode(bytes).match(/^\s*\$themeMod\s*=\s*(.+?)\s*$/m)
@@ -731,7 +1029,7 @@ const readThemeMod = () => {
 }
 let keysMod = readThemeMod()
 const KeysCtrl = () => createModal({
-    name: "keys", tabTitle: "KEYBINDS", W: 470, H: 600,
+    name: "keys", tabTitle: "KEYBINDS", W: 470, H: 660,
     onOpen: () => { keysMod = readThemeMod() },
     draw: (ctx, g) => {
         const x = g.X + 24, top = g.Y + HEADER + 10

@@ -42,17 +42,17 @@ export const panelPath = (ctx, x, y, w, h) => {
     return pts
 }
 
-export const drawGlass = (ctx, x, y, w, h, col: [number, number, number] = CYAN) => {
+export const drawGlass = (ctx, x, y, w, h, col: [number, number, number] = CYAN, a = 1) => {
     const [r, g, b] = col
     panelPath(ctx, x, y, w, h)
     const gb = new Cairo.LinearGradient(x, y, x + w * 0.5, y + h)
-    gb.addColorStopRGBA(0, r * 0.14, g * 0.14 + 0.06, b * 0.18 + 0.02, 0.93)
-    gb.addColorStopRGBA(0.5, r * 0.02 + 0.004, g * 0.04 + 0.02, b * 0.06 + 0.03, 0.9)
-    gb.addColorStopRGBA(1, r * 0.04, g * 0.06 + 0.03, b * 0.1 + 0.03, 0.94)
+    gb.addColorStopRGBA(0, r * 0.14, g * 0.14 + 0.06, b * 0.18 + 0.02, 0.93 * a)
+    gb.addColorStopRGBA(0.5, r * 0.02 + 0.004, g * 0.04 + 0.02, b * 0.06 + 0.03, 0.9 * a)
+    gb.addColorStopRGBA(1, r * 0.04, g * 0.06 + 0.03, b * 0.1 + 0.03, 0.94 * a)
     ctx.setSource(gb); ctx.fill()
     ctx.save(); panelPath(ctx, x, y, w, h); ctx.clip()
     const gs = new Cairo.LinearGradient(x, y, x + w * 0.65, y + h * 0.55)
-    gs.addColorStopRGBA(0, 0.8, 0.97, 1, 0.13); gs.addColorStopRGBA(0.5, r, g, b, 0)
+    gs.addColorStopRGBA(0, 0.8, 0.97, 1, 0.13 * a); gs.addColorStopRGBA(0.5, r, g, b, 0)
     ctx.setOperator(12); ctx.setSource(gs); ctx.rectangle(x, y, w, h); ctx.fill(); ctx.setOperator(2)
     ctx.restore()
     const lr = r + (1 - r) * 0.45, lg = g + (1 - g) * 0.45, lb = b + (1 - b) * 0.45
