@@ -2,7 +2,7 @@
 
 
 
-import { Box, DrawingArea, EventBox } from "../../widget.ts"
+import { Box, DrawingArea, EventBox, Keymode } from "../../widget.ts"
 import Gdk from "gi://Gdk?version=3.0"
 import GLib from "gi://GLib"
 import { interval, execAsync } from "astal"
@@ -10,7 +10,8 @@ import { CYBER_DIR } from "../../env.ts"
 import { makePlane, tiltText, strokePath, fillQuad, alertChip } from "./proj.ts"
 import { NEON } from "./colors.ts"
 import { createModal } from "./cmodal.ts"
-import { txt as gtxt, pango as gpango, RED, RACC, HEADER as GHEAD, TITLE as GTITLE, MONO as GMONO } from "./glass.ts"
+import { txt as gtxt, pango as gpango, RED, RACC, CYAN as GCYAN, ACC as GACC, HEADER as GHEAD, TITLE as GTITLE, MONO as GMONO, pip, projQuad } from "./glass.ts"
+import { openTimeModal } from "./timeset.ts"
 
 const Cairo = (imports).cairo
 
@@ -85,7 +86,7 @@ const refreshNetSpeed = () => {
  areas.forEach(a => a?.queue_draw())
 }
 const WMO = { 0: "Clear", 1: "Mainly clear", 2: "Partly cloudy", 3: "Overcast", 45: "Fog", 48: "Fog", 51: "Drizzle", 53: "Drizzle", 55: "Drizzle", 56: "Freezing drizzle", 57: "Freezing drizzle", 61: "Light rain", 63: "Rain", 65: "Heavy rain", 66: "Freezing rain", 67: "Freezing rain", 71: "Light snow", 73: "Snow", 75: "Heavy snow", 77: "Snow grains", 80: "Showers", 81: "Showers", 82: "Heavy showers", 85: "Snow showers", 86: "Snow showers", 95: "Thunderstorm", 96: "Thunderstorm", 99: "Thunderstorm" }
-const forecast: { day: string; hi: string; lo: string; code: number; pop: number }[] = []
+const forecast: { day: string; hi: string; lo: string; code: number; pop: number; hiN: number; loN: number; wind: number; uv: number; sunrise: string; sunset: string; date: string }[] = []
 let areas: any[] = []
 
 
@@ -136,14 +137,21 @@ const fetchMap = async () => {
 }
 const refreshWeather = async () => {
  try {
- const url = `https://api.open-meteo.com/v1/forecast?latitude=${wxLat}&longitude=${wxLon}&current=temperature_2m,apparent_temperature,relative_humidity_2m,weather_code,wind_speed_10m&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max&forecast_days=7&timezone=auto`
+ const url = `https://api.open-meteo.com/v1/forecast?latitude=${wxLat}&longitude=${wxLon}&current=temperature_2m,apparent_temperature,relative_humidity_2m,weather_code,wind_speed_10m&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max,wind_speed_10m_max,uv_index_max,sunrise,sunset&forecast_days=7&timezone=auto`
  const j = JSON.parse(await execAsync(["curl", "-sf", "--max-time", "9", url]))
  const c = j.current
  if (c) { wxTemp = `${Math.round(c.temperature_2m)}°`; wxFeels = `${Math.round(c.apparent_temperature)}°`; wxDesc = WMO[c.weather_code] || "—"; wxHum = `${Math.round(c.relative_humidity_2m)}`; wxWind = `${Math.round(c.wind_speed_10m)}` }
  const dd = j.daily; forecast.length = 0
  if (dd && dd.time) for (let i = 0; i < dd.time.length && i < 7; i++) {
  const dt = new Date(dd.time[i] + "T12:00:00")
- forecast.push({ day: WD3[dt.getDay()], hi: `${Math.round(dd.temperature_2m_max[i])}°`, lo: `${Math.round(dd.temperature_2m_min[i])}°`, code: c.weather_code?.[i] ?? 0, pop: c.precipitation_probability_max?.[i] ?? 0 })
+ const hiN = Math.round(dd.temperature_2m_max[i]), loN = Math.round(dd.temperature_2m_min[i])
+ forecast.push({
+ day: WD3[dt.getDay()], hi: `${hiN}°`, lo: `${loN}°`, hiN, loN,
+ code: dd.weather_code?.[i] ?? 0, pop: dd.precipitation_probability_max?.[i] ?? 0,
+ wind: Math.round(dd.wind_speed_10m_max?.[i] ?? 0), uv: Math.round(dd.uv_index_max?.[i] ?? 0),
+ sunrise: (dd.sunrise?.[i] || "").slice(11, 16), sunset: (dd.sunset?.[i] || "").slice(11, 16),
+ date: `${dt.getDate()} ${MON3[dt.getMonth()]}`,
+ })
  }
  } catch (e) { wxDesc = "OFFLINE" }
  areas.forEach(a => a?.queue_draw())
@@ -228,7 +236,7 @@ const drawOverlay = (ctx, now) => {
  strokePath(ctx, minimap, [[MX0 + 2, fy + 5], [MX1 - 2, fy + 5]], NETCOL, 0.16, 5)
  strokePath(ctx, minimap, [[MX0 + 2, fy + 5], [MX1 - 2, fy + 5]], NETCOL, 0.62, 1)
  tiltText(ctx, minimap, MX0, fy, "7-DAY FORECAST", TITLE, 9, NETCOL, 0.85, { bold: true, glow: 0.32 })
- tiltText(ctx, minimap, MX1, fy, "RIGHT-CLICK \u25B8 CITY", MONO, 7, NEON.cyan, 0.38, { align: "r" })
+ tiltText(ctx, minimap, MX1, fy, "L-CLICK \u25B8 DETAILS \u00B7 R \u25B8 CITY", MONO, 7, NEON.cyan, 0.38, { align: "r" })
  const span = (MX1 - MX0) / 7
  for (let i = 0; i < 7; i++) {
  const cx = MX0 + i * span + span / 2, d = forecast[i], today = i === 0
@@ -290,6 +298,12 @@ export const SidePanel = () => {
  evt.connect("button-press-event", (_w, e) => {
  let btn = 0
  try { btn = e.get_button?.()[1] ?? 0 } catch {}
+ let px = 0, py = 0
+ try { const c = e.get_coords?.(); if (c && c.length >= 3) { px = c[1]; py = c[2] } } catch {}
+ const onClock = pip(px, py, projQuad(minimap, MX0 + 2, MY0 - 26, MX0 + 76, MY0 + 4))
+ const onWx = pip(px, py, projQuad(minimap, MX0 - 4, MY1 - 28, MX1 + 4, MY1 + 110))
+ if (btn === 3 && onClock) { openTimeModal(); return true }
+ if (btn === 1 && onWx) { openForecastModal(); return true }
  if (btn === 3) openCityModal()
  return false
  })
@@ -355,3 +369,165 @@ const ensureWxModal = () => {
  })
 }
 export const openCityModal = () => { ensureWxModal(); wxModal.toggle() }
+
+let fcModal: any = null, fcSel = 0, fcTick = 0, fcOpenAt = 0, fcCityTap = 0
+const ease = (t) => 1 - Math.pow(1 - Math.max(0, Math.min(1, t)), 3)
+const fcReveal = () => ease((Date.now() - fcOpenAt) / 620)
+
+const YEL: [number, number, number] = [252 / 255, 238 / 255, 10 / 255]
+const ARA: [number, number, number] = RACC
+const HOT: [number, number, number] = [255 / 255, 42 / 255, 58 / 255]
+
+const chamfer = (ctx, x, y, w, h, c = 11) => {
+ ctx.newPath()
+ ctx.moveTo(x, y); ctx.lineTo(x + w, y); ctx.lineTo(x + w, y + h - c)
+ ctx.lineTo(x + w - c, y + h); ctx.lineTo(x, y + h); ctx.closePath()
+}
+const bracket = (ctx, x, y, w, h, col, a, len = 9) => {
+ ctx.setSourceRGBA(col[0], col[1], col[2], a); ctx.setLineWidth(1.6)
+ ctx.newPath(); ctx.moveTo(x, y + len); ctx.lineTo(x, y); ctx.lineTo(x + len, y); ctx.stroke()
+ ctx.newPath(); ctx.moveTo(x + w - len, y); ctx.lineTo(x + w, y); ctx.lineTo(x + w, y + len); ctx.stroke()
+ ctx.newPath(); ctx.moveTo(x, y + h - len); ctx.lineTo(x, y + h); ctx.lineTo(x + len, y + h); ctx.stroke()
+}
+const hatch = (ctx, x, y, w, h, col, a, gap = 7) => {
+ ctx.save(); ctx.rectangle(x, y, w, h); ctx.clip()
+ ctx.setSourceRGBA(col[0], col[1], col[2], a); ctx.setLineWidth(0.8)
+ for (let i = -h; i < w; i += gap) { ctx.newPath(); ctx.moveTo(x + i, y + h); ctx.lineTo(x + i + h, y); ctx.stroke() }
+ ctx.restore()
+}
+const ghost = (ctx, x, y, s, font, size, a = 0.4) => {
+ gtxt(ctx, x - 2, y + 1.2, s, font, size, HOT, a, 1)
+}
+
+const fcCard = (ctx, g, d, i, x, y, w, h, sel, rv) => {
+ const col = sel ? YEL : ARA
+ chamfer(ctx, x, y, w, h, 12)
+ ctx.setSourceRGBA(col[0] * 0.22, col[1] * 0.3, col[2] * 0.36, sel ? 0.26 : 0.09); ctx.fill()
+ chamfer(ctx, x, y, w, h, 12)
+ ctx.setSourceRGBA(col[0], col[1], col[2], sel ? 0.95 : 0.26); ctx.setLineWidth(sel ? 1.4 : 0.9); ctx.stroke()
+ if (sel) { ctx.setSourceRGBA(YEL[0], YEL[1], YEL[2], 0.72 + 0.28 * Math.sin(fcTick / 7)); ctx.rectangle(x, y, w, 3); ctx.fill() }
+ const cw2 = (s, font, size, bold) => { ctx.selectFontFace(font, 0, bold ? 1 : 0); ctx.setFontSize(size); return ctx.textExtents(s).width }
+ const fit = (s, font, size, bold, max) => { let sz = size; while (sz > 8 && cw2(s, font, sz, bold) > max) sz -= 0.5; return sz }
+ gtxt(ctx, x + 5, y + 15, `0${i + 1}`, GMONO, 7, sel ? YEL : ARA, sel ? 0.75 : 0.35)
+ gtxt(ctx, x + w / 2 - cw2(d ? d.day : "--", GTITLE, 12, true) / 2, y + 30, d ? d.day : "--", GTITLE, 12, sel ? YEL : ARA, sel ? 1 : 0.75, 1, sel ? 0.45 : 0)
+ gtxt(ctx, x + w / 2 - cw2(d ? d.date : "", GMONO, 8.5, true) / 2, y + 43, d ? d.date : "", GMONO, 8.5, sel ? YEL : ARA, sel ? 0.95 : 0.72, 1)
+ if (!d) return
+ gpango(ctx, x + w / 2 - 13, y + 76, wxIcon(WMO[d.code] || ""), ICONF, false, 25, sel ? YEL : ARA, sel ? 0.98 : 0.6)
+ const hs = fit(d.hi, GTITLE, 17, true, w - 14), hw = cw2(d.hi, GTITLE, hs, true)
+ if (sel) ghost(ctx, x + w / 2 - hw / 2, y + 102, d.hi, GTITLE, hs, 0.45)
+ gtxt(ctx, x + w / 2 - hw / 2, y + 102, d.hi, GTITLE, hs, sel ? YEL : ARA, 0.97, 1, sel ? 0.4 : 0)
+ gtxt(ctx, x + w / 2 - cw2(d.lo, GMONO, 10, false) / 2, y + 117, d.lo, GMONO, 10, ARA, 0.5)
+ const segs = 7, sh = 4, sg = 2, bx = x + 8, bw = w - 16
+ const on = Math.round((d.pop / 100) * segs * rv)
+ const sw2 = (bw - sg * (segs - 1)) / segs
+ for (let s = 0; s < segs; s++) {
+ const lit = s < on
+ ctx.setSourceRGBA(lit ? YEL[0] : ARA[0], lit ? YEL[1] : ARA[1], lit ? YEL[2] : ARA[2], lit ? 0.92 : 0.13)
+ ctx.rectangle(bx + s * (sw2 + sg), y + h - 26, sw2, sh); ctx.fill()
+ }
+ gtxt(ctx, x + w / 2 - cw2(`${d.pop}%`, GMONO, 7.5, false) / 2, y + h - 10, `${d.pop}%`, GMONO, 7.5, d.pop > 0 ? YEL : ARA, d.pop > 0 ? 0.8 : 0.45)
+}
+
+const fcCurve = (ctx, days, x, y, w, h, rv) => {
+ if (days.length < 2) return
+ const his = days.map(d => d.hiN), los = days.map(d => d.loN)
+ const mx = Math.max(...his) + 2, mn = Math.min(...los) - 2, rg = Math.max(1, mx - mn)
+ const px = (i) => x + (i / (days.length - 1)) * w
+ const py = (v) => y + h - ((v - mn) / rg) * h
+ const n = Math.max(2, Math.ceil(days.length * rv))
+ ctx.newPath(); ctx.moveTo(px(0), y + h)
+ for (let i = 0; i < n; i++) ctx.lineTo(px(i), py(his[i]))
+ ctx.lineTo(px(n - 1), y + h); ctx.closePath()
+ ctx.setSourceRGBA(YEL[0], YEL[1], YEL[2], 0.07); ctx.fill()
+ ctx.setSourceRGBA(ARA[0], ARA[1], ARA[2], 0.16); ctx.setLineWidth(0.8)
+ for (let i = 0; i < n; i++) { ctx.newPath(); ctx.moveTo(px(i), py(his[i])); ctx.lineTo(px(i), y + h); ctx.stroke() }
+ for (const [vals, cc, aa, lw] of [[los, ARA, 0.5, 1.2], [his, YEL, 0.95, 1.9]] as any) {
+ ctx.newPath()
+ for (let i = 0; i < n; i++) { const X = px(i), Y = py(vals[i]); i === 0 ? ctx.moveTo(X, Y) : ctx.lineTo(X, Y) }
+ ctx.setSourceRGBA(cc[0], cc[1], cc[2], aa); ctx.setLineWidth(lw); ctx.stroke()
+ for (let i = 0; i < n; i++) {
+ const X = px(i), Y = py(vals[i])
+ ctx.setSourceRGBA(cc[0], cc[1], cc[2], aa)
+ ctx.rectangle(X - 2.4, Y - 2.4, 4.8, 4.8); ctx.fill()
+ }
+ }
+ gtxt(ctx, x - 12, y + 6, `${Math.round(mx)}`, GMONO, 7, ARA, 0.4)
+ gtxt(ctx, x - 12, y + h, `${Math.round(mn)}`, GMONO, 7, ARA, 0.4)
+}
+
+const ensureForecastModal = () => {
+ if (fcModal) return
+ fcModal = createModal({
+ name: "forecast", tabTitle: "ATMOSPHERIC UPLINK · 7-DAY", W: 940, H: 480,
+ col: RED, accent: YEL, yaw: -29, pitch: -5, roll: -0.4, focal: 2400, dist: 2300, glass: 0.88, anchorLeft: true, keymode: Keymode.ON_DEMAND,
+ onOpen: () => { fcSel = 0; fcTick = 0; fcOpenAt = Date.now(); refreshWeather() },
+ onFrame: () => { fcTick++; fcModal.requestDraw() },
+ onKey: (k) => {
+ if (k === Gdk.KEY_Left) fcSel = Math.max(0, fcSel - 1)
+ else if (k === Gdk.KEY_Right) fcSel = Math.min(Math.max(0, forecast.length - 1), fcSel + 1)
+ else return
+ fcModal.requestDraw()
+ },
+ draw: (ctx, g) => {
+ const rv = fcReveal(), d = forecast[fcSel]
+ const x0 = g.X + 18, y0 = g.Y + GHEAD + 6, lw = 250
+ gtxt(ctx, x0, y0 + 12, (geoCity || wxName || "NIGHT CITY").slice(0, 34).toUpperCase(), GTITLE, 11, YEL, 0.95, 1, 0.35)
+ gtxt(ctx, x0, y0 + 27, geoCoords, GMONO, 8, ARA, 0.45)
+ g.push({ kind: "city", bx0: x0 - 6, by0: y0 - 2, bx1: x0 + lw, by1: y0 + 32, on: () => {
+ const t = Date.now()
+ if (t - fcCityTap < 450) { fcCityTap = 0; fcModal.close(); openCityModal() } else fcCityTap = t
+ } })
+
+ chamfer(ctx, x0, y0 + 36, lw, 128, 14)
+ ctx.setSourceRGBA(ARA[0] * 0.24, ARA[1] * 0.34, ARA[2] * 0.42, 0.16); ctx.fill()
+ hatch(ctx, x0 + lw - 54, y0 + 36, 54, 26, ARA, 0.10)
+ chamfer(ctx, x0, y0 + 36, lw, 128, 14)
+ ctx.setSourceRGBA(ARA[0], ARA[1], ARA[2], 0.42); ctx.setLineWidth(1); ctx.stroke()
+ bracket(ctx, x0 + 4, y0 + 40, lw - 8, 120, YEL, 0.5)
+ if (d) {
+ gpango(ctx, x0 + 16, y0 + 104, wxIcon(WMO[d.code] || ""), ICONF, false, 46, YEL, 0.95)
+ ghost(ctx, x0 + 88, y0 + 100, d.hi, GTITLE, 44, 0.4)
+ gpango(ctx, x0 + 88, y0 + 100, d.hi, GTITLE, true, 44, YEL, 0.98)
+ gtxt(ctx, x0 + 88, y0 + 122, `LOW ${d.lo}`, GMONO, 10, ARA, 0.6)
+ gtxt(ctx, x0 + 16, y0 + 132, (WMO[d.code] || "—").toUpperCase(), GTITLE, 11, ARA, 0.8, 1)
+ gtxt(ctx, x0 + 16, y0 + 152, `${d.day} · ${d.date}`, GMONO, 9, ARA, 0.5)
+ }
+ const rows: [string, string][] = d ? [
+ ["PRECIPITATION", `${d.pop}%`], ["WIND MAX", `${d.wind} km/h`], ["UV INDEX", `${d.uv}`],
+ ["SUNRISE", d.sunrise || "--:--"], ["SUNSET", d.sunset || "--:--"],
+ ] : []
+ let ry = y0 + 186
+ for (const [k, v] of rows) {
+ ctx.setSourceRGBA(ARA[0], ARA[1], ARA[2], 0.14)
+ ctx.newPath(); ctx.moveTo(x0, ry + 6); ctx.lineTo(x0 + lw, ry + 6); ctx.setLineWidth(1); ctx.stroke()
+ ctx.setSourceRGBA(YEL[0], YEL[1], YEL[2], 0.55)
+ ctx.rectangle(x0, ry - 6, 2, 8); ctx.fill()
+ gtxt(ctx, x0 + 8, ry, k, GMONO, 9, ARA, 0.55)
+ gtxt(ctx, x0 + lw - ctx.textExtents(v).width, ry, v, GTITLE, 11, YEL, 0.92, 1)
+ ry += 24
+ }
+ ctx.setSourceRGBA(YEL[0], YEL[1], YEL[2], 0.85)
+ ctx.rectangle(x0, y0 + 308, 22, 2); ctx.fill()
+ gtxt(ctx, x0 + 28, y0 + 312, "// LIVE", GMONO, 8, YEL, 0.7)
+ gtxt(ctx, x0, y0 + 334, `${wxTemp}  ${wxDesc.toUpperCase()}`, GTITLE, 13, YEL, 0.9, 1, 0.25)
+ gtxt(ctx, x0, y0 + 350, `FEELS ${wxFeels} · HUM ${wxHum}% · WIND ${wxWind}`, GMONO, 8.5, ARA, 0.5)
+
+ const rx = x0 + lw + 26, rw = (g.X + g.w) - rx - 18
+ const cw = rw / 7, ch = 182
+ for (let i = 0; i < 7; i++) {
+ const cx = rx + i * cw + 3, d2 = forecast[i]
+ fcCard(ctx, g, d2, i, cx, y0 + 10, cw - 6, ch, i === fcSel, rv)
+ g.push({ kind: "day", bx0: cx, by0: y0 + 10, bx1: cx + cw - 6, by1: y0 + 10 + ch, on: () => { fcSel = i; fcModal.requestDraw() } })
+ }
+ const gy = y0 + ch + 34, gh = 140
+ ctx.setSourceRGBA(YEL[0], YEL[1], YEL[2], 0.85)
+ ctx.rectangle(rx, gy - 14, 14, 2); ctx.fill()
+ gtxt(ctx, rx + 20, gy - 10, "// THERMAL TREND · 7 DAYS", GMONO, 8.5, YEL, 0.7)
+ ctx.setSourceRGBA(ARA[0], ARA[1], ARA[2], 0.07)
+ for (let i = 0; i <= 4; i++) { const yy = gy + (gh / 4) * i; ctx.newPath(); ctx.moveTo(rx, yy); ctx.lineTo(rx + rw - 6, yy); ctx.setLineWidth(1); ctx.stroke() }
+ fcCurve(ctx, forecast, rx + 14, gy, rw - 34, gh, rv)
+ gtxt(ctx, g.X + 18, g.Y + g.h - 10, "click a day · double-click the city to change it · ESC closes", GMONO, 8, ARA, 0.45)
+ },
+ })
+}
+export const openForecastModal = () => { ensureForecastModal(); fcModal.toggle() }
