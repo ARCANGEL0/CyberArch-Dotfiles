@@ -1,8 +1,8 @@
 local cyberpunk = os.getenv("HOME") .. "/.config/hypr/themes/cyberpunk"
 local themeMod  = "SUPER + SHIFT"
 local augSock   = os.getenv("XDG_RUNTIME_DIR") .. "/astal/cyberpunk.sock"
-local TERM      = "kitty"
-local TERMFLOAT = "kitty --title fly_is_foot"
+local TERM      = "rio"
+local TERMFLOAT = "rio"
 
 local once = function(cmd)
     hl.on("hyprland.start", function()
@@ -33,6 +33,7 @@ local sock = function(msg)
 end
 
 hl.bind("SUPER + TAB", hl.dsp.exec_cmd(cyberpunk .. "/scripts/launcher"))
+hl.bind("SUPER + T", hl.dsp.exec_cmd(TERM))
 hl.bind(themeMod .. " + Z", sock("toggle-hud"))
 hl.bind(themeMod .. " + V", sock("modal vol"))
 hl.bind(themeMod .. " + I", sock("modal brt"))
@@ -43,7 +44,8 @@ hl.bind(themeMod .. " + O", sock("player"))
 hl.bind(themeMod .. " + N", sock("modal wifi"))
 hl.bind(themeMod .. " + B", sock("modal bt"))
 hl.bind(themeMod .. " + P", sock("modal pwr"))
-hl.bind(themeMod .. " + W", sock("weather"))
+hl.bind(themeMod .. " + W", sock("forecast"))
+hl.bind(themeMod .. " + minus", sock("clock"))
 hl.bind(themeMod .. " + Y", sock("modal bat"))
 hl.bind(themeMod .. " + C", sock("modal sys"))
 hl.bind(themeMod .. " + H", sock("modal keys"))
@@ -156,6 +158,16 @@ if barsfh then
 end
 
 hl.layer_rule({ match = { namespace = "modal_.*" }, blur = true })
+
+hl.window_rule({
+    name        = "rio-terminal",
+    match       = { class = "^(rio)$" },
+    border_size = 0,
+    no_shadow   = true,
+    float       = true,
+    size        = "1238 766",
+    center      = true,
+})
 
 hl.window_rule({ match = { class = "^cool-retro-term$" },          float = true })
 hl.window_rule({ match = { class = "^cool-retro-term$" },          center = true })
