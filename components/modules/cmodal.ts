@@ -133,7 +133,7 @@ export const createModal = (spec) => {
     const yaw = spec.yaw ?? 0, pitch = spec.pitch ?? 0, roll = spec.roll ?? 0
     const plane = (yaw || pitch || roll)
         ? makePlane({ w: W, h: H, yaw, pitch, roll, focal: spec.focal ?? 1000, dist: spec.dist ?? 1000, pad: 30 })
-        : makeModalPlane(W, H)
+        : makePlane({ w: W, h: H, yaw: 0, pitch: 0, roll: 0, focal: 1000, dist: 1000, pad: spec.pad ?? 30 })
     let surf: any = null, sctx: any = null, win: any = null, area: any = null
     let visible = false, intro = 0, introTarget = 0, seed = 0
     let animT: any = null, pollT: any = null, lastFrame = 0
@@ -808,7 +808,7 @@ const slotSq = (ctx, x, y, w, h, label, val, frac, col, hot) => {
 }
 const groupLabel = (ctx, x, y, s) => txt(ctx, x, y, s, MONO, 9.5, SYSR, 0.85, 1)
 
-const SysCtrl = () => {
+const SysCtrl = (SW, SH) => {
     const st: any = {
         cpu: 0, cores: [], cpuHist: [], memU: 0, memT: 1, memCache: 0, swapU: 0, swapT: 0, ramHist: [],
         up: "0.0", down: "0.0", upHist: [], downHist: [], temp: 0, mhz: 0, load: "—", uptime: "—",
@@ -878,7 +878,7 @@ const SysCtrl = () => {
     const select = (p) => { st.sel = p.pid; st.selProc = p; st.scroll = 0; ctrl.requestDraw() }
     const killSel = () => { if (st.sel) sh(`kill -9 ${st.sel} 2>/dev/null`).then(() => { st.sel = ""; st.selProc = null; timeout(400, refresh) }) }
     ctrl = createModal({
-        name: "sys", tabTitle: "SYSTEM MONITOR", W: SCREEN_WIDTH, H: SCREEN_HEIGHT, noGlass: true,
+        name: "sys", tabTitle: "SYSTEM MONITOR", W: SW, H: SH, noGlass: true, pad: 0,
         idleFrameMs: 70,
         onFrame: () => {
             const tc = st.cpu / 100, tm = st.memU / st.memT
@@ -897,14 +897,15 @@ const SysCtrl = () => {
             const X = g.X, Y = g.Y, W = g.w, H = g.h
             const memF = st.memU / st.memT
 
-            ctx.setSourceRGBA(0.015, 0.02, 0.03, 0.42); ctx.rectangle(X, Y, W, H); ctx.fill()
+            const FW = SW, FH = SH
+            ctx.setSourceRGBA(0.015, 0.02, 0.03, 0.42); ctx.rectangle(0, 0, FW, FH); ctx.fill()
             const pulse = 0.94 + 0.06 * Math.sin(Date.now() / 500)
-            const vcx = X + W / 2, vcy = Y + H / 2, reach = Math.hypot(W, H) / 2
+            const vcx = FW / 2, vcy = FH / 2, reach = Math.hypot(FW, FH) / 2
             const vg = new Cairo.RadialGradient(vcx, vcy, reach * 0.16, vcx, vcy, reach * 0.98)
             vg.addColorStopRGBA(0, 0.02, 0, 0.01, 0.46)
             vg.addColorStopRGBA(0.5, 0.06, 0, 0.01, 0.68)
             vg.addColorStopRGBA(1, 0.19, 0, 0.03, 0.92 * pulse)
-            ctx.setSource(vg); ctx.rectangle(X, Y, W, H); ctx.fill()
+            ctx.setSource(vg); ctx.rectangle(0, 0, FW, FH); ctx.fill()
 
             const hy = Y + 40
             ctx.setSourceRGBA(SYSR[0], SYSR[1], SYSR[2], 0.55); ctx.setLineWidth(1)
@@ -1104,11 +1105,29 @@ const AurCtrl = () => {
     return ctrl
 }
 
-export const CModalWindows = () => [register(VolCtrl()), register(BrtCtrl()), register(WifiCtrl()), register(BtCtrl()), register(PwrCtrl()), register(BatCtrl()), register(SysCtrl()), register(KeysCtrl()), register(AurCtrl())]
+let sysInst: any = null, sysKey = ""
+const sysDims = () => {
+  try {
+    const m = activeMonitor()
+    const g = m && m.get_geometry ? m.get_geometry() : null
+    if (g && g.width > 0 && g.height > 0) return [g.width, g.height]
+  } catch { }
+  return [SCREEN_WIDTH, SCREEN_HEIGHT]
+}
+const sysGet = () => {
+  const d = sysDims(), key = `${d[0]}x${d[1]}`
+  if (!sysInst || sysKey !== key) {
+    if (sysInst) { try { sysInst.close() } catch { } }
+    sysInst = SysCtrl(d[0], d[1]); sysKey = key; cregistry["sys"] = sysInst
+  }
+  return sysInst
+}
+export const CModalWindows = () => [register(VolCtrl()), register(BrtCtrl()), register(WifiCtrl()), register(BtCtrl()), register(PwrCtrl()), register(BatCtrl()), register(KeysCtrl()), register(AurCtrl())]
 
 
 export const toggleModal = (name) => {
     if (name === "mic") name = "vol"
+    if (name === "sys") sysGet()
     for (const k in cregistry) if (k !== name) cregistry[k].close()
     if (cregistry[name]) { cregistry[name].toggle() }
     else { for (const k in cregistry) cregistry[k].close() }
