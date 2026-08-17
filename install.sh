@@ -282,9 +282,18 @@ hdr "DEFAULT SHELL · fish"
 printf "[!] Set default shell to fish with custom themes? (y/N) "
 read -r ans </dev/tty
 if [ "$ans" = "y" ] || [ "$ans" = "Y" ]; then
+  chafa_ok() { command -v chafa >/dev/null 2>&1 && chafa --version >/dev/null 2>&1; }
   if ! sudo pacman -S --needed --noconfirm fish chafa git; then
     echo "ERROR: Package installation failed."
     exit 1
+  fi
+  if ! chafa_ok; then
+    warn "chafa cannot start |::| $(chafa --version 2>&1 | head -1)"
+    step "relinking chafa against the current x265/libheif..."
+    sudo pacman -S --noconfirm x265 libheif chafa || true
+  fi
+  if ! chafa_ok; then
+    warn "chafa still broken |::| run 'sudo pacman -Syu' to clear the partial upgrade, then re-run."
   fi
   CFG="$HOME/.config/fish/config.fish"
   mkdir -p "$(dirname "$CFG")"
