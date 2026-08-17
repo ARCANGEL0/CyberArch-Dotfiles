@@ -4,9 +4,13 @@ SOCK="$XDG_RUNTIME_DIR/astal/cyberpunk.sock"
 exec 9>"/tmp/hypr-record.lock"
 flock -w 2 9 || exit 0          # wait up to 2s for the lock, then just give up instead of stacking
 
-if pgrep -x wf-recorder >/dev/null; then
-    # it's recording -> stop it. SIGINT (not -9) so wf-recorder can finish writing the mp4 properly
-    pkill -INT -x wf-recorder
+if ! command -v wf-recorder >/dev/null 2>&1; then
+    notify-send "Cyberpunk HUD" "wf-recorder is not installed - screen recording unavailable" 2>/dev/null
+    exit 1
+fi
+
+if pgrep -x wf-recorder >/dev/null 2>&1 || pgrep -f '[w]f-recorder' >/dev/null 2>&1; then
+    pkill -INT -x wf-recorder 2>/dev/null || pkill -INT -f '[w]f-recorder' 2>/dev/null
     echo "record-stop" | socat - UNIX-CONNECT:"$SOCK" 2>/dev/null
 else
     echo "record-region" | socat - UNIX-CONNECT:"$SOCK" 2>/dev/null

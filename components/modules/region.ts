@@ -6,7 +6,7 @@ import { SCREEN_WIDTH , SCREEN_HEIGHT } from "../../env.ts"
 import { NEON, f } from "./colors.ts"
 import { MONO } from "./fonts.ts"
 import { CYBER_DIR } from "../../env.ts"
-import { setRecording } from "./anim.ts"
+import { setRecording, isRecording } from "./anim.ts"
 import { showToast, hideToast } from "./toast.ts"
 import GdkPixbuf from "gi://GdkPixbuf"
 
@@ -375,7 +375,15 @@ const monitorPayload = (payload = "") => {
  return { x: 0, y: 0, w: SCREEN_WIDTH, h: SCREEN_HEIGHT }
 }
 
-export const triggerRecordRegion = (payload = "") => { recordMode = true; triggerRegion(payload, true) }
+export const triggerRecordRegion = (payload = "") => {
+ if (isRecording()) {
+ execAsync(["sh", "-c", "pkill -INT -x wf-recorder 2>/dev/null || pkill -INT -f '[w]f-recorder' 2>/dev/null"]).catch(() => {})
+ try { setRecording(false) } catch (e) { print(e) }
+ return
+ }
+ if (active) { cancel(); return }
+ recordMode = true; triggerRegion(payload, true)
+}
 
 export const triggerRegion = (payload = "", record = false) => {
  recordMode = record
