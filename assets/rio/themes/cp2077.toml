@@ -1,0 +1,64 @@
+# Cyberpunk 2077 / Arasaka neon theme for Rio Terminal
+# Red-dominant surface, bright-yellow active tab, neon cyan/green/magenta pops.
+# No white text: defaults are red-tinted, foreground is neon red.
+[colors]
+background = '#080002'
+foreground = '#FF4D5E'
+
+# Regular colors
+black = '#0E0304'
+red = '#FF1E3C'
+green = '#39FF88'
+yellow = '#FCE300'
+blue = '#00B4FF'
+magenta = '#FF29D4'
+cyan = '#00FFC8'
+white = '#FF4D5E'
+
+# Cursor
+cursor = '#FCE300'
+vi-cursor = '#FF1E3C'
+
+# Navigation
+tabs = '#1A060A'
+tabs-active = '#FCE300'
+tab-border = '#FF1E3C'
+bar = '#050102'
+split = '#1A060A'
+split-active = '#FF1E3C'
+
+# Search
+search-match-background = '#FCE300'
+search-match-foreground = '#080002'
+search-focused-match-background = '#FF1E3C'
+search-focused-match-foreground = '#080002'
+
+# Hints
+hint-foreground = '#080002'
+hint-background = '#FCE300'
+
+# Selection
+selection-foreground = '#080002'
+selection-background = '#FF1E3C'
+
+# Dim colors
+dim-black = '#0A0102'
+dim-red = '#B3002A'
+dim-green = '#00B347'
+dim-yellow = '#B3A000'
+dim-blue = '#0080B3'
+dim-magenta = '#B300B3'
+dim-cyan = '#00A8B3'
+dim-white = '#B3505E'
+dim-foreground = '#B3505E'
+
+# Light colors
+light-black = '#3A0F16'
+light-red = '#FF6B7D'
+light-green = '#7DFFB5'
+light-yellow = '#FFE66B'
+light-blue = '#4DD2FF'
+light-magenta = '#FF7DE8'
+light-cyan = '#5FFFE0'
+light-white = '#FF8F9C'
+light-foreground = '#FF8F9C'

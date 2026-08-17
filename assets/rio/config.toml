@@ -7,9 +7,17 @@ line-height = 1.18
 margin = [14, 18, 10, 18]
 
 scrollback-history-limit = 20000
-confirm-before-quit = false
+confirm-before-quit = true
 copy-on-select = false
 hide-mouse-cursor-when-typing = true
+
+
+[colors]
+
+cursor = "#00ffff"
+vi-cursor = "#00ffff"
+selection-background = "#c4d8f2"
+selection-foreground = "#00ffff"
 
 [window]
 opacity = 0.97
@@ -24,6 +32,8 @@ use-drawable-chars = true
 hinting = true
 features = ["calt", "liga"]
 disable-warnings-not-found = false
+
+
 
 symbol-map = [
   { start = "23FB", end = "23FF", "font-family" = "Symbols Nerd Font Mono" },
@@ -55,6 +65,7 @@ blinking-interval = 600
 [effects]
 trail-cursor = true
 custom-mouse-cursor = false
+trail-cursor-color = "#00ffff"
 
 [navigation]
 mode = "Tab"
@@ -62,6 +73,8 @@ hide-if-single = true
 use-split = true
 current-working-directory = true
 unfocused-split-opacity = 0.55
+enable-scroll-bar = true
+
 
 [[navigation.color-automation]]
 program = "nvim"
@@ -95,7 +108,7 @@ content = "{{ title || program }}"
 placeholder = "▮ rio"
 
 [bell]
-audio = false
+audio = true
 
 [renderer]
 backend = "Webgpu"

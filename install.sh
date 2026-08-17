@@ -355,6 +355,31 @@ detect_shell() {
   fi
   return 1
 }
+theme_lua_ok() {
+  local lb
+  lb="$(command -v lua5.4 || command -v lua || true)"
+  [ -n "$lb" ] || return 0
+  "$lb" - >/dev/null 2>&1 <<'LUACHK'
+local node
+node = function()
+  return setmetatable({}, { __index = function() return node() end, __call = function() return {} end })
+end
+hl = setmetatable({ dsp = node(), plugin = node() }, { __index = function() return function() end end })
+local mod = os.getenv("HOME") .. "/.config/hypr/themes/cyberpunk"
+local target = mod .. "/theme.lua"
+local fh = io.open(target, "r")
+if not fh then os.exit(1) end
+fh:close()
+package.path = mod .. "/?.lua;" .. package.path
+local ok = pcall(dofile, target)
+os.exit(ok and 0 or 1)
+LUACHK
+}
+dm_active() {
+  systemctl is-active --quiet display-manager 2>/dev/null && return 0
+  pgrep -x sddm >/dev/null 2>&1 || pgrep -x gdm >/dev/null 2>&1 || pgrep -x greetd >/dev/null 2>&1 \
+    || pgrep -x ly >/dev/null 2>&1 || pgrep -x lightdm >/dev/null 2>&1
+}
 SHELL_NAME="$(detect_shell || true)"
 if [ -n "$SHELL_NAME" ]; then
   printf "${YEL}${B}[!] %s has been detected as your current desktop shell.${R}\n" "$SHELL_NAME"
@@ -362,9 +387,19 @@ if [ -n "$SHELL_NAME" ]; then
   printf "[!] Do you wish to continue? (y/N) "
   read -r ans </dev/tty
   if [ "$ans" = "y" ] || [ "$ans" = "Y" ]; then
-    if [ -f "$HYLUA" ]; then cp -f "$HYLUA" "$HYLUA.bak" && ok "backed up $HYLUA → $HYLUA.bak"; fi
+    HYBAK=""
+    if [ -f "$HYLUA" ]; then
+      HYBAK="$HYLUA.bak.$(date +%s)"
+      cp -f "$HYLUA" "$HYBAK" && ok "backed up $HYLUA → $HYBAK"
+    fi
+    if ! theme_lua_ok; then
+      err "theme.lua does not load on this machine |::| refusing to replace $HYLUA."
+      warn "that would leave Hyprland with no working config (black screen on next login)."
+      exit 1
+    fi
     printf 'package.path = os.getenv("HOME") .. "/.config/hypr/themes/cyberpunk/?.lua;" .. (package.path or "")\nrequire("theme")\n' > "$HYLUA"
     ok "hyprland.lua now loads the cyberpunk theme in place of $SHELL_NAME"
+    [ -n "$HYBAK" ] && warn "your previous config is at $HYBAK |::| monitors/input settings live there, port what you need."
   else
     warn "aborted |::| no files were changed. Nothing was replaced."
     exit 0
@@ -437,7 +472,22 @@ hl = {
   on = function() end, env = function() end, config = function() end,
   curve = function() end, animation = function() end,
   window_rule = function() end, layer_rule = function() end, plugin = node(),
-  bind = function(mods) combos[#combos + 1] = tostring(mods) end,
+  bind = function(mods)
+    local d = ""
+    local info = debug.getinfo(2, "Sl")
+    if info and info.short_src and info.currentline then
+      local fh = io.open(info.short_src, "r")
+      if fh then
+        local i = 0
+        for line in fh:lines() do
+          i = i + 1
+          if i == info.currentline then d = line break end
+        end
+        fh:close()
+      end
+    end
+    combos[#combos + 1] = tostring(mods) .. "\t" .. d
+  end,
   define_submap = function(_, fn) if type(fn) == "function" then fn() end end,
 }
 local mod = os.getenv("HOME") .. "/.config/hypr/themes/cyberpunk"
@@ -464,19 +514,77 @@ canon() {
     printf '%s' "$key"
   fi
 }
+kb_pretty() {
+  case "$1" in
+    vol)            printf 'volume' ;;
+    brt)            printf 'brightness' ;;
+    pwr)            printf 'power menu' ;;
+    bt)             printf 'bluetooth' ;;
+    bat)            printf 'battery' ;;
+    sys)            printf 'system monitor' ;;
+    keys)           printf 'keybind help' ;;
+    aur)            printf 'system upgrade' ;;
+    wifi)           printf 'wifi' ;;
+    mic)            printf 'microphone' ;;
+    toggle-hud)     printf 'toggle HUD' ;;
+    player)         printf 'music player' ;;
+    forecast)       printf 'weather forecast' ;;
+    clock)          printf 'system time' ;;
+    weather)        printf 'city picker' ;;
+    aur-dismiss)    printf 'dismiss update bar' ;;
+    notif-hud)      printf 'notification center' ;;
+    notif-read)     printf 'open notification' ;;
+    notif-dismiss)  printf 'dismiss notification' ;;
+    overkill)       printf 'kill mode' ;;
+    screenrecord)   printf 'screen record' ;;
+    screenshot)     printf 'screenshot' ;;
+    launcher)       printf 'app launcher' ;;
+    terminal)       printf 'netrunner terminal' ;;
+    peek)           printf 'peek desktop' ;;
+    ws)             printf 'workspace switch' ;;
+    TERM)           printf 'terminal' ;;
+    *)              printf '%s' "${1//-/ }" ;;
+  esac
+}
+kb_desc() {
+  local l="$1" m
+  m="$(printf '%s' "$l" | sed -n 's/.*sock("\([^"]*\)").*/\1/p')"
+  if [ -n "$m" ]; then
+    case "$m" in
+      "modal "*) kb_pretty "${m#modal }" ;;
+      *)         kb_pretty "$m" ;;
+    esac
+    return 0
+  fi
+  m="$(printf '%s' "$l" | sed -n 's|.*/scripts/\([A-Za-z0-9_-]*\).*|\1|p')"
+  [ -n "$m" ] && { kb_pretty "$m"; return 0; }
+  m="$(printf '%s' "$l" | sed -n 's/.*exec_cmd(\([A-Za-z0-9_]*\)).*/\1/p')"
+  [ -n "$m" ] && { kb_pretty "$m"; return 0; }
+  m="$(printf '%s' "$l" | sed -n 's/.*hl\.dsp\.\([A-Za-z0-9_.]*\).*/\1/p')"
+  if [ -n "$m" ] && [ "$m" != "exec_cmd" ]; then printf '%s' "${m//./ }"; return 0; fi
+  printf 'theme bind'
+}
 declare -a THEME_COMBOS=()
+declare -A THEME_DESC=()
 for c in "${THEME_RAW[@]}"; do
   [[ "$c" == __ERROR__* ]] && { warn "${c#__ERROR__ }"; continue; }
   [ -z "$c" ] && continue
-  THEME_COMBOS+=("$(canon "$c")")
+  _combo="${c%%	*}"; _src="${c#*	}"
+  [ "$_src" = "$c" ] && _src=""
+  _cc="$(canon "$_combo")"
+  THEME_COMBOS+=("$_cc")
+  [ -n "$_src" ] && THEME_DESC["$_cc"]="$(kb_desc "$_src")"
 done
 THAS() {
   local want="$1" t
   for t in "${THEME_COMBOS[@]}"; do [ "$t" = "$want" ] && return 0; done
   return 1
 }
-declare -a CF_FILE=() CF_LINE=() CF_TEXT=() CF_COMBO=() CF_MARK=()
-cf_add() { CF_FILE+=("$1"); CF_LINE+=("$2"); CF_TEXT+=("$3"); CF_COMBO+=("$4"); CF_MARK+=(1); }
+declare -a CF_FILE=() CF_LINE=() CF_TEXT=() CF_COMBO=() CF_DESC=() CF_MARK=()
+cf_add() {
+  CF_FILE+=("$1"); CF_LINE+=("$2"); CF_TEXT+=("$3"); CF_COMBO+=("$4")
+  CF_DESC+=("${THEME_DESC[$4]:-theme bind}"); CF_MARK+=(1)
+}
 cf_comment() {
   local f="$1" n="$2"
   if [[ "$f" == *.lua ]]; then sed -i "${n}s|^|-- |" "$f"; else sed -i "${n}s|^|#|" "$f"; fi
@@ -561,29 +669,47 @@ kb_key() {
   esac
   return 0
 }
+kb_restore() { printf '\033[?25h\033[?1049l'; }
+kb_size() {
+  local sz
+  sz="$(stty size </dev/tty 2>/dev/null)" || sz=""
+  KB_ROWS="${sz%% *}"; KB_COLS="${sz##* }"
+  [[ "$KB_ROWS" =~ ^[0-9]+$ ]] || KB_ROWS=24
+  [[ "$KB_COLS" =~ ^[0-9]+$ ]] || KB_COLS=100
+}
 kb_picker() {
-  local total="${#CF_FILE[@]}" cur=0 i drawn=0 cols avail mark ptr txt loc locp any n_on
+  local total="${#CF_FILE[@]}" cur=0 top=0 i vis avail mark ptr txt loc locp any n_on out row applied
   if [ "$total" -eq 0 ]; then ok "no theme keybind conflicts found."; return 0; fi
-  cols="$(tput cols 2>/dev/null || echo 100)"
-  avail=$((cols - 52)); [ "$avail" -lt 24 ] && avail=24
-  printf '\033[?25l'
+  trap 'kb_restore' EXIT INT TERM
+  printf '\033[?1049h\033[?25l'
   while :; do
-    [ "$drawn" -gt 0 ] && printf '\033[%dA' "$drawn"
-    drawn=0
+    kb_size
+    vis=$((KB_ROWS - 7)); [ "$vis" -lt 3 ] && vis=3
+    [ "$vis" -gt "$total" ] && vis="$total"
+    [ "$cur" -lt "$top" ] && top="$cur"
+    [ "$cur" -ge $((top + vis)) ] && top=$((cur - vis + 1))
+    [ "$top" -lt 0 ] && top=0
+    avail=$((KB_COLS - 52)); [ "$avail" -lt 20 ] && avail=20
     n_on=0; for ((i=0;i<total;i++)); do [ "${CF_MARK[i]}" -eq 1 ] && n_on=$((n_on+1)); done
-    printf '\033[2K%b\n' "  ${RED}${B}KEYBIND CONFLICTS DETECTED${R}   ${GREY}${total} found · ${n_on} marked${R}"; drawn=$((drawn+1))
-    printf '\033[2K%b\n' "  ${GREY}up/down move · SPACE toggle · A all · ENTER apply · Q skip${R}"; drawn=$((drawn+1))
-    printf '\033[2K\n'; drawn=$((drawn+1))
-    for ((i=0;i<total;i++)); do
-      if [ "${CF_MARK[i]}" -eq 1 ]; then mark="${GRN}[x]${R}"; else mark="${GREY}[ ]${R}"; fi
-      if [ "$i" -eq "$cur" ]; then ptr="${CYAN}${B}>${R}"; else ptr=" "; fi
-      printf -v loc '%s:%s' "$(basename "${CF_FILE[i]}")" "${CF_LINE[i]}"
+    out=$'\033[H\033[2J'
+    out+="  ${RED}${B}KEYBIND CONFLICTS DETECTED${R}   ${GREY}${total} found · ${n_on} marked${R}"$'\n'
+    out+="  ${GREY}these binds collide with the theme. marked ones get commented out.${R}"$'\n\n'
+    for ((row=top; row<top+vis && row<total; row++)); do
+      if [ "${CF_MARK[row]}" -eq 1 ]; then mark="${GRN}[x]${R}"; else mark="${GREY}[ ]${R}"; fi
+      if [ "$row" -eq "$cur" ]; then ptr="${CYAN}${B}>${R}"; else ptr=" "; fi
+      printf -v loc '%s:%s' "$(basename "${CF_FILE[row]}")" "${CF_LINE[row]}"
       printf -v locp '%-22s' "$loc"
-      txt="${CF_TEXT[i]}"
+      txt="${CF_TEXT[row]}"
       [ "${#txt}" -gt "$avail" ] && txt="${txt:0:avail}..."
-      printf '\033[2K %b %b %b%b %b%b\n' "$ptr" "$mark" "${YEL}" "$locp${R}" "$txt" "  ${GREY}::${R} ${CYAN}${CF_COMBO[i]}${R}"
-      drawn=$((drawn+1))
+      out+=" $ptr $mark ${YEL}${locp}${R} ${txt}  ${GREY}::${R} ${CYAN}${CF_COMBO[row]}${R} ${GREY}(${CF_DESC[row]})${R}"$'\n'
     done
+    if [ "$total" -gt "$vis" ]; then
+      out+=$'\n'"  ${GREY}showing $((top+1))-$((top+vis)) of ${total}${R}"$'\n'
+    else
+      out+=$'\n'
+    fi
+    out+=$'\n'"  ${GREY}up/down move · SPACE toggle · A all · ENTER apply · Q skip${R}"
+    printf '%s' "$out"
     kb_key
     case "$KB_KEY" in
       up)    cur=$(( (cur - 1 + total) % total )) ;;
@@ -592,11 +718,11 @@ kb_picker() {
       all)   any=0; for ((i=0;i<total;i++)); do [ "${CF_MARK[i]}" -eq 0 ] && any=1; done
              for ((i=0;i<total;i++)); do CF_MARK[i]=$any; done ;;
       enter) break ;;
-      quit)  printf '\033[?25h'; warn "skipped |::| no keybinds changed."; return 0 ;;
+      quit)  kb_restore; trap - EXIT INT TERM; warn "skipped |::| no keybinds changed."; return 0 ;;
     esac
   done
-  printf '\033[?25h\n'
-  local applied=0
+  kb_restore; trap - EXIT INT TERM
+  applied=0
   for ((i=0;i<total;i++)); do
     [ "${CF_MARK[i]}" -eq 1 ] || continue
     if cf_comment "${CF_FILE[i]}" "${CF_LINE[i]}"; then
@@ -660,10 +786,11 @@ block_comment "$USERCONF"
 hdr "CYBER TERMINAL"
 GTSRC="$THEME/assets/rio"
 GTCFG="$HOME/.config/rio"
-GTBIN="$HOME/.cargo/bin/rio"
+GTBIN="${CARGO_HOME:-$HOME/.cargo}/bin/rio"
 GTVER="0.4.5"
 GTKEY="SUPER + T"
-gt_has_gpu() { [ -x "$1" ] && strings -n 8 "$1" 2>/dev/null | grep -qi librashader; }
+gt_has_gpu() { command -v strings >/dev/null 2>&1 || return 1; [ -x "$1" ] && strings -n 8 "$1" 2>/dev/null | grep -qi librashader; }
+gt_runs() { [ -x "$1" ] && "$1" --version >/dev/null 2>&1; }
 gt_rust_ok() { command -v cargo >/dev/null 2>&1 && command -v rustc >/dev/null 2>&1 && rustc -vV >/dev/null 2>&1 && cargo -V >/dev/null 2>&1; }
 gt_rust_err() { rustc -vV 2>&1 | grep -v '^$' | head -1; }
 if [ ! -d "$GTSRC" ]; then
@@ -675,7 +802,7 @@ else
     warn "GPU Terminal not installed. |::| Skipping..."
   else
     GT_OK=0
-    GT_DEPS="rust llvm-libs cmake pkgconf fontconfig freetype2 libxkbcommon wayland vulkan-icd-loader"
+    GT_DEPS="rust llvm-libs cmake pkgconf binutils fontconfig freetype2 libxkbcommon wayland vulkan-icd-loader mesa"
     step "installing rust toolchain + build dependencies..."
     sudo pacman -S --needed --noconfirm $GT_DEPS || warn "some build dependencies failed to install"
     if ! gt_rust_ok; then
@@ -692,11 +819,17 @@ else
       err "rust toolchain unusable |::| $(gt_rust_err)"
       warn "GPU Terminal not installed. |::| Skipping..."
     else
-      gt_has_gpu "$GTBIN" && step "rebuilding GPU Terminal to match this theme..." || step "building GPU Terminal with GPU shader support..."
-      if cargo install rioterm --version "$GTVER" --force --locked --features wgpu; then
-        gt_has_gpu "$GTBIN" && GT_OK=1
+      gt_runs "$GTBIN" && step "rebuilding GPU Terminal to match this theme..." || step "building GPU Terminal with GPU shader support..."
+      cargo install rioterm --version "$GTVER" --force --locked --features wgpu || warn "cargo reported a build failure |::| checking for a usable binary anyway"
+      gt_runs "$GTBIN" || GTBIN="$(command -v rio 2>/dev/null || printf '%s' "$GTBIN")"
+      if gt_runs "$GTBIN"; then
+        GT_OK=1
+        if gt_has_gpu "$GTBIN"; then ok "librashader present |::| CRT shader will run"
+        else warn "shader symbols not detected, but the build used --features wgpu |::| deploying the CRT config anyway"; fi
+      else
+        err "no runnable rio binary at $GTBIN"
+        warn "GPU Terminal not installed. |::| Skipping..."
       fi
-      [ "$GT_OK" = 1 ] || { err "GPU shader build unavailable."; warn "GPU Terminal not installed. |::| Skipping..."; }
     fi
     if [ "$GT_OK" = 1 ]; then
       step "deploying terminal theme and CRT shader..."
@@ -711,6 +844,12 @@ else
       sed -i "s|__RIO_SHADER__|$GTCFG/shaders/newpixie-flat|g" "$GTCFG/config.toml"
       sed "s|__RIO_BIN__|$GTBIN|g" "$GTSRC/desktop/rio.desktop" > "$HOME/.local/share/applications/rio.desktop"
       cp "$GTSRC/desktop/rio.svg" "$HOME/.local/share/icons/hicolor/scalable/apps/rio.svg"
+      mkdir -p "$HOME/.local/bin"
+      ln -sfn "$GTBIN" "$HOME/.local/bin/rio" && ok "linked ~/.local/bin/rio -> $GTBIN"
+      case ":$PATH:" in
+        *":$HOME/.local/bin:"*) : ;;
+        *) warn "add ~/.local/bin to your PATH to run 'rio' from a shell" ;;
+      esac
       update-desktop-database "$HOME/.local/share/applications" 2>/dev/null || true
       gtk-update-icon-cache -f -t "$HOME/.local/share/icons/hicolor" 2>/dev/null || true
       ok "Cyber Terminal installed |::| use $GTKEY to open the Terminal."
@@ -792,8 +931,14 @@ else
   printf "${GRN}${B}  Cyberpunk Hyprland Installation is complete${R} ${GREY}|::| Welcome to Night City, choom.${R}\n"
   printf "${GREY}  Log out and back in so the theme config and autostart entries load cleanly.${R}\n"
 fi
-printf "[!] Restart Hyprland now? (y/N) "
-read -r ans </dev/tty
+if dm_active; then
+  printf "[!] Restart Hyprland now? (y/N) "
+  read -r ans </dev/tty
+else
+  warn "no display manager detected |::| killing Hyprland here drops you to a black TTY with nothing to log back in with."
+  printf "[!] Restart Hyprland anyway? (y/N) "
+  read -r ans </dev/tty
+fi
 if [ "$ans" = "y" ] || [ "$ans" = "Y" ]; then
   printf "${CYAN}  ▸ restarting Hyprland…${R}\n"
   pkill -x Hyprland 2>/dev/null || hyprctl dispatch exit >/dev/null 2>&1
