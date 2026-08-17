@@ -406,7 +406,8 @@ fi
 hdr "HYPRLAND · legacy hyprland.conf cleanup"
 if [ -f "$HYDIR/hyprland.conf" ]; then
   warn "hyprland.conf personal keybinds are superseded once the Lua config loads — port any binds into hyprland.lua or the theme."
-  OLDCNT="$(grep -Ec '^\s*source\s*=.*theme\.conf' "$HYDIR/hyprland.conf" 2>/dev/null || echo 0)"
+  OLDCNT="$(grep -Ec '^[[:space:]]*source[[:space:]]*=.*theme\.conf' "$HYDIR/hyprland.conf" 2>/dev/null)"
+  [ -n "$OLDCNT" ] || OLDCNT=0
   if [ "$OLDCNT" -gt 0 ]; then
     cp -f "$HYDIR/hyprland.conf" "$HYDIR/hyprland.conf.bak.$(date +%s)" 2>/dev/null && ok "backed up hyprland.conf" || warn "couldn't back up hyprland.conf (continuing)"
     if sed -i -E 's/^(\s*source\s*=.*theme\.conf)/#\1/' "$HYDIR/hyprland.conf"; then
@@ -474,22 +475,24 @@ THAS() {
   for t in "${THEME_COMBOS[@]}"; do [ "$t" = "$want" ] && return 0; done
   return 1
 }
+declare -a CF_FILE=() CF_LINE=() CF_TEXT=() CF_COMBO=() CF_MARK=()
+cf_add() { CF_FILE+=("$1"); CF_LINE+=("$2"); CF_TEXT+=("$3"); CF_COMBO+=("$4"); CF_MARK+=(1); }
+cf_comment() {
+  local f="$1" n="$2"
+  if [[ "$f" == *.lua ]]; then sed -i "${n}s|^|-- |" "$f"; else sed -i "${n}s|^|#|" "$f"; fi
+}
 lua_scan() {
-  local f="$1" n=0 found=0 ln c raw
+  local f="$1" n=0 ln c raw
   [ -f "$f" ] || return 0
   while IFS= read -r ln; do
     n=$((n+1))
-    raw="$(printf '%s\n' "$ln" | sed -n 's/.*hl\.bind([[:space:]]*["'\'']\([^"'\'']*\)["'\''].*/\1/p')"
+    [[ "$ln" =~ ^[[:space:]]*-- ]] && continue
+    raw="$(printf '%s\n' "$ln" | sed -n 's/.*hl\.bind([[:space:]]*["'\''"]\([^"'\''"]*\)["'\''"].*/\1/p')"
     [ -n "$raw" ] || continue
     c="$(canon "$raw")"
     THAS "$c" || continue
-    found=1
-    printf "\n${RED}${B}[!] KEYBINDING CONFLICTING WITH THEME ::${R}\n"
-    printf "  ${YEL}%s:%s${R}  %s\n" "$(basename "$f")" "$n" "$(printf '%s' "$ln" | sed 's/^[[:space:]]*//')"
-    printf "  ${CYAN}THEME USES${R} %s\n" "$c"
-    printf "  remove or rebind it in %s — the theme binds load last and win.\n" "$(basename "$f")"
+    cf_add "$f" "$n" "$(printf '%s' "$ln" | sed 's/^[[:space:]]*//')" "$c"
   done < "$f"
-  [ "$found" -eq 0 ] && ok "no theme keybind conflicts in $(basename "$f")"
   return 0
 }
 USERCONF="$HYDIR/user.conf"
@@ -520,7 +523,7 @@ kb_fields() {
   KB_M="${body%%,*}"; rest="${body#*,}"; KB_K="${rest%%,*}"
 }
 kb_scan() {
-  local f="$1" n=0 found=0 ln c
+  local f="$1" n=0 ln c
   [ -f "$f" ] || { warn "$(basename "$f") not found |::| skipped."; return 0; }
   while IFS= read -r ln; do
     n=$((n+1))
@@ -530,30 +533,90 @@ kb_scan() {
     [ -n "${KB_K// /}" ] || continue
     c="$(kb_combo "$KB_M" "$KB_K")"
     THAS "$c" || continue
-    found=1
-    if [[ "${KB_K// /}" =~ ^[0-9]$ ]]; then
-      sed -i "${n}s|^|#|" "$f" && ok "commented $(basename "$f"):$n"
-      continue
-    fi
-    printf "\n${RED}${B}[!] KEYBINDING CONFLICTING WITH THEME ::${R}\n"
-    printf "  ${YEL}%s:%s${R}  %s\n" "$(basename "$f")" "$n" "$(printf '%s' "$ln" | sed 's/^[[:space:]]*//')"
-    printf "  ${CYAN}THEME USES${R} %s\n" "$c"
-    printf "[!] Comment this line in %s and set the theme default? (y/N) " "$(basename "$f")"
-    read -r ans </dev/tty
-    if [ "$ans" = "y" ] || [ "$ans" = "Y" ]; then
-      sed -i "${n}s|^|#|" "$f" && ok "commented $(basename "$f"):$n"
-    else
-      warn "skipped |::| it may shadow the theme keybind."
-    fi
+    cf_add "$f" "$n" "$(printf '%s' "$ln" | sed 's/^[[:space:]]*//')" "$c"
   done < "$f"
-  [ "$found" -eq 0 ] && ok "no theme keybind conflicts in $(basename "$f")"
+  return 0
+}
+KB_KEY=""
+kb_key() {
+  local k rest
+  IFS= read -rsn1 k </dev/tty || { KB_KEY="quit"; return 0; }
+  if [ -z "$k" ]; then KB_KEY="enter"; return 0; fi
+  if [ "$k" = $'\e' ]; then
+    IFS= read -rsn2 -t 0.06 rest </dev/tty || rest=""
+    case "$rest" in
+      "[A") KB_KEY="up" ;;
+      "[B") KB_KEY="down" ;;
+      *)    KB_KEY="quit" ;;
+    esac
+    return 0
+  fi
+  case "$k" in
+    " ")  KB_KEY="space" ;;
+    k|K)  KB_KEY="up" ;;
+    j|J)  KB_KEY="down" ;;
+    a|A)  KB_KEY="all" ;;
+    q|Q)  KB_KEY="quit" ;;
+    *)    KB_KEY="none" ;;
+  esac
+  return 0
+}
+kb_picker() {
+  local total="${#CF_FILE[@]}" cur=0 i drawn=0 cols avail mark ptr txt loc locp any n_on
+  if [ "$total" -eq 0 ]; then ok "no theme keybind conflicts found."; return 0; fi
+  cols="$(tput cols 2>/dev/null || echo 100)"
+  avail=$((cols - 52)); [ "$avail" -lt 24 ] && avail=24
+  printf '\033[?25l'
+  while :; do
+    [ "$drawn" -gt 0 ] && printf '\033[%dA' "$drawn"
+    drawn=0
+    n_on=0; for ((i=0;i<total;i++)); do [ "${CF_MARK[i]}" -eq 1 ] && n_on=$((n_on+1)); done
+    printf '\033[2K%b\n' "  ${RED}${B}KEYBIND CONFLICTS DETECTED${R}   ${GREY}${total} found · ${n_on} marked${R}"; drawn=$((drawn+1))
+    printf '\033[2K%b\n' "  ${GREY}up/down move · SPACE toggle · A all · ENTER apply · Q skip${R}"; drawn=$((drawn+1))
+    printf '\033[2K\n'; drawn=$((drawn+1))
+    for ((i=0;i<total;i++)); do
+      if [ "${CF_MARK[i]}" -eq 1 ]; then mark="${GRN}[x]${R}"; else mark="${GREY}[ ]${R}"; fi
+      if [ "$i" -eq "$cur" ]; then ptr="${CYAN}${B}>${R}"; else ptr=" "; fi
+      printf -v loc '%s:%s' "$(basename "${CF_FILE[i]}")" "${CF_LINE[i]}"
+      printf -v locp '%-22s' "$loc"
+      txt="${CF_TEXT[i]}"
+      [ "${#txt}" -gt "$avail" ] && txt="${txt:0:avail}..."
+      printf '\033[2K %b %b %b%b %b%b\n' "$ptr" "$mark" "${YEL}" "$locp${R}" "$txt" "  ${GREY}::${R} ${CYAN}${CF_COMBO[i]}${R}"
+      drawn=$((drawn+1))
+    done
+    kb_key
+    case "$KB_KEY" in
+      up)    cur=$(( (cur - 1 + total) % total )) ;;
+      down)  cur=$(( (cur + 1) % total )) ;;
+      space) if [ "${CF_MARK[cur]}" -eq 1 ]; then CF_MARK[cur]=0; else CF_MARK[cur]=1; fi ;;
+      all)   any=0; for ((i=0;i<total;i++)); do [ "${CF_MARK[i]}" -eq 0 ] && any=1; done
+             for ((i=0;i<total;i++)); do CF_MARK[i]=$any; done ;;
+      enter) break ;;
+      quit)  printf '\033[?25h'; warn "skipped |::| no keybinds changed."; return 0 ;;
+    esac
+  done
+  printf '\033[?25h\n'
+  local applied=0
+  for ((i=0;i<total;i++)); do
+    [ "${CF_MARK[i]}" -eq 1 ] || continue
+    if cf_comment "${CF_FILE[i]}" "${CF_LINE[i]}"; then
+      ok "commented $(basename "${CF_FILE[i]}"):${CF_LINE[i]}  ${CF_COMBO[i]}"
+      applied=$((applied+1))
+    else
+      warn "could not patch $(basename "${CF_FILE[i]}"):${CF_LINE[i]}"
+    fi
+  done
+  if [ "$applied" -eq 0 ]; then warn "nothing marked |::| the theme binds still load last and win."
+  else ok "$applied conflicting bind(s) commented out."; fi
   return 0
 }
 kb_loadvars "$HYDIR/hyprland.conf"; kb_loadvars "$USERCONF"
 lua_scan "$HYLUA"
-lua_scan "$USERCONF".lua
+lua_scan "$HYDIR/user.lua"
+for _lf in "$HYDIR"/land/*.lua; do [ -f "$_lf" ] && lua_scan "$_lf"; done
 kb_scan "$HYDIR/hyprland.conf"
 kb_scan "$USERCONF"
+kb_picker
 
 hdr "HYPRLAND · stale options"
 stale_scan() {
@@ -590,7 +653,10 @@ block_comment() {
 }
 block_comment "$HYDIR/hyprland.conf"
 block_comment "$USERCONF"
-
+# rust stuff and the new cybre terminal
+# Cool retro term gives a cool 'Arasaka UI' but in leverage of alot of CPU
+# Rio terminal uses GPU and has some nice 'glassy effects' for the theme without burning so much memory
+# and also has image support unlike CRT.
 hdr "CYBER TERMINAL"
 GTSRC="$THEME/assets/rio"
 GTCFG="$HOME/.config/rio"
@@ -598,6 +664,8 @@ GTBIN="$HOME/.cargo/bin/rio"
 GTVER="0.4.5"
 GTKEY="SUPER + T"
 gt_has_gpu() { [ -x "$1" ] && strings -n 8 "$1" 2>/dev/null | grep -qi librashader; }
+gt_rust_ok() { command -v cargo >/dev/null 2>&1 && command -v rustc >/dev/null 2>&1 && rustc -vV >/dev/null 2>&1 && cargo -V >/dev/null 2>&1; }
+gt_rust_err() { rustc -vV 2>&1 | grep -v '^$' | head -1; }
 if [ ! -d "$GTSRC" ]; then
   warn "GPU Terminal assets missing. |::| Skipping..."
 else
@@ -607,12 +675,21 @@ else
     warn "GPU Terminal not installed. |::| Skipping..."
   else
     GT_OK=0
-    if ! command -v cargo >/dev/null 2>&1; then
-      step "installing rust toolchain..."
-      sudo pacman -S --needed --noconfirm rust >/dev/null 2>&1 || true
+    GT_DEPS="rust llvm-libs cmake pkgconf fontconfig freetype2 libxkbcommon wayland vulkan-icd-loader"
+    step "installing rust toolchain + build dependencies..."
+    sudo pacman -S --needed --noconfirm $GT_DEPS || warn "some build dependencies failed to install"
+    if ! gt_rust_ok; then
+      warn "rust present but not runnable |::| $(gt_rust_err)"
+      step "repairing rust + llvm-libs..."
+      sudo pacman -S --noconfirm rust llvm-libs || true
     fi
-    if ! command -v cargo >/dev/null 2>&1; then
-      err "rust toolchain unavailable."
+    if ! gt_rust_ok; then
+      step "falling back to rustup..."
+      sudo pacman -S --needed --noconfirm rustup || true
+      rustup default stable || true
+    fi
+    if ! gt_rust_ok; then
+      err "rust toolchain unusable |::| $(gt_rust_err)"
       warn "GPU Terminal not installed. |::| Skipping..."
     else
       gt_has_gpu "$GTBIN" && step "rebuilding GPU Terminal to match this theme..." || step "building GPU Terminal with GPU shader support..."
@@ -710,16 +787,17 @@ printf " "
 
 line
 if [ "$NEED_RESTART" = 1 ]; then
-  printf "${YEL}${B}  ⚠ A Hyprland restart is required to apply changes and bring up the titlebars.${R}\n"
-  printf "[!] Restart Hyprland now? (y/N) "
-  read -r ans </dev/tty
-  if [ "$ans" = "y" ] || [ "$ans" = "Y" ]; then
-    printf "${CYAN}  ▸ restarting Hyprland…${R}\n"
-    pkill -x Hyprland 2>/dev/null || hyprctl dispatch exit >/dev/null 2>&1
-  else
-    printf "${GREY}  Restart Hyprland yourself when ready (log out / back in, or: ${B}pkill Hyprland${R}${GREY}).${R}\n"
-  fi
+  printf "${YEL}${B}  A Hyprland restart is required to apply changes and bring up the titlebars.${R}\n"
 else
-  printf "${GRN}${B}  ✓ Cyberpunk Hyprland Installation is complete${R} ${GREY}|::| Welcome to Night City, choom.${R}\n"
+  printf "${GRN}${B}  Cyberpunk Hyprland Installation is complete${R} ${GREY}|::| Welcome to Night City, choom.${R}\n"
+  printf "${GREY}  Log out and back in so the theme config and autostart entries load cleanly.${R}\n"
+fi
+printf "[!] Restart Hyprland now? (y/N) "
+read -r ans </dev/tty
+if [ "$ans" = "y" ] || [ "$ans" = "Y" ]; then
+  printf "${CYAN}  ▸ restarting Hyprland…${R}\n"
+  pkill -x Hyprland 2>/dev/null || hyprctl dispatch exit >/dev/null 2>&1
+else
+  printf "${GREY}  Restart Hyprland yourself when ready (log out / back in, or: ${B}pkill Hyprland${R}${GREY}).${R}\n"
 fi
 line
