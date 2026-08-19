@@ -23,7 +23,7 @@ REPO=(
   gjs grim wf-recorder wl-clipboard networkmanager bluez-utils curl
   wireplumber playerctl brightnessctl power-profiles-daemon upower
   hypridle socat jq rofi libnotify sassc kitty kvantum kvantum-qt5 wget fuse2 sqlite3 pacman-contrib
-  base-devel pkgconf cmake cpio gcc lib32-libelf chafa
+  base-devel pkgconf cmake cpio gcc lib32-libelf
   pipewire pipewire-audio pipewire-pulse libpulse mpv ffmpeg sox
   ttf-jetbrains-mono ttf-firacode-nerd ttf-nerd-fonts-symbols
   lib32-gnutls dnsmasq pipewire-alsa ffmpeg4.4 gst-plugin-pipewire lib32-nettle
@@ -167,13 +167,19 @@ fi
 
 hdr "UI FONTS"
 FONTSRC="$THEME/assets/fonts"
-FONTDST="$HOME/.local/share/fonts/cyberpunk"
-if [ -d "$FONTSRC" ] && compgen -G "$FONTSRC/*.ttf" >/dev/null; then
-  mkdir -p "$FONTDST"
-  cp -f "$FONTSRC"/*.ttf "$FONTDST"/ && ok "installed $(ls "$FONTSRC"/*.ttf | wc -l) font files → $FONTDST"
-  fc-cache -f "$FONTDST" >/dev/null 2>&1 && ok "font cache refreshed (Quantico · Rajdhani · Roboto Condensed)" || warn "fc-cache not run (install fontconfig)"
+FONTDST="/usr/local/share/fonts/cyberpunk"
+if [ -d "$FONTSRC" ]; then
+  mapfile -t FONTFILES < <(find "$FONTSRC" -maxdepth 1 -type f \( -iname '*.ttf' -o -iname '*.otf' \) | sort)
 else
-  warn "bundled fonts missing at $FONTSRC |::| Quantico/Rajdhani text will fall back to sans-serif."
+  FONTFILES=()
+fi
+if [ "${#FONTFILES[@]}" -gt 0 ]; then
+  sudo install -d -m 755 "$FONTDST"
+  for f in "${FONTFILES[@]}"; do sudo install -m 644 "$f" "$FONTDST/"; done
+  ok "installed ${#FONTFILES[@]} font files → $FONTDST"
+  fc-cache -f "$FONTDST" >/dev/null 2>&1 && ok "font cache refreshed (systemwide cyberpunk fonts)" || warn "fc-cache not run (install fontconfig)"
+else
+  warn "bundled fonts missing at $FONTSRC |::| theme text will fall back to sans-serif."
 fi
 
 hdr "PACMAN HOOK"
@@ -282,18 +288,9 @@ hdr "DEFAULT SHELL · fish"
 printf "[!] Set default shell to fish with custom themes? (y/N) "
 read -r ans </dev/tty
 if [ "$ans" = "y" ] || [ "$ans" = "Y" ]; then
-  chafa_ok() { command -v chafa >/dev/null 2>&1 && chafa --version >/dev/null 2>&1; }
-  if ! sudo pacman -S --needed --noconfirm fish chafa git; then
+  if ! sudo pacman -S --needed --noconfirm fish git; then
     echo "ERROR: Package installation failed."
     exit 1
-  fi
-  if ! chafa_ok; then
-    warn "chafa cannot start |::| $(chafa --version 2>&1 | head -1)"
-    step "relinking chafa against the current x265/libheif..."
-    sudo pacman -S --noconfirm x265 libheif chafa || true
-  fi
-  if ! chafa_ok; then
-    warn "chafa still broken |::| run 'sudo pacman -Syu' to clear the partial upgrade, then re-run."
   fi
   CFG="$HOME/.config/fish/config.fish"
   mkdir -p "$(dirname "$CFG")"
@@ -317,7 +314,7 @@ if [ "$ans" = "y" ] || [ "$ans" = "Y" ]; then
   grep -q dangerous_nogreeting "$CFG" 2>/dev/null || sed -i '2i set -U dangerous_nogreeting' "$CFG" || true
   sed -i 's|^[[:space:]]*starship init.*|#&|' "$CFG" 2>/dev/null || true
   if ! grep -q samurai.png "$CFG" 2>/dev/null; then
-    printf '\nif status is-interactive\n    chafa $HOME/.config/hypr/themes/cyberpunk/assets/cool-retro-term/samurai.png\nend\n' >> "$CFG"
+    printf '\nif status is-interactive\n    if type -q kitten\n        kitten icat --align left $HOME/.config/hypr/themes/cyberpunk/assets/cool-retro-term/samurai.png\n    end\nend\n' >> "$CFG"
   fi
   FISH_PATH="/usr/bin/fish"
   if ! grep -q "$FISH_PATH" /etc/shells 2>/dev/null; then

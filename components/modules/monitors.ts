@@ -38,6 +38,12 @@ const batDir = ((): string | null => {
     return null
 })()
 const readBat = () => batDir ? (parseInt(read(`${batDir}/capacity`).trim()) || 0) / 100 : 1
+const HAS_BAT = batDir !== null
+const YELB: RGB = [255, 214, 31] as any
+let batStatus = ""
+const readBatStatus = () => { batStatus = batDir ? read(`${batDir}/status`).trim() : "" }
+const isCharging = () => batStatus === "Charging"
+readBatStatus()
 
 let diskFrac = 0, diskUsedG = 0, diskTotG = 0
 const readDisk = () => { try {
@@ -47,7 +53,7 @@ const readDisk = () => { try {
 } catch {} }
 readDisk(); let batteryV = readBat()
 const poke = Variable(0)
-interval(8000, () => { readDisk(); batteryV = readBat(); poke.set(poke.get() + 1) })
+interval(8000, () => { readDisk(); batteryV = readBat(); readBatStatus(); poke.set(poke.get() + 1) })
 
 let badgeVal = "1"
 export const setWorkspaceBadge = (v: any) => {
@@ -204,8 +210,20 @@ export const Monitors = () => {
         tiltText(ctx, plane, W, 46, cpu.percent.get(), TITLE, 24, LIGHTRED, 1, { align: "r", bold: true, glow: 0.42 })
         const ramUsed = ram.substat.get().replace(/\s*GB/i, ""), ramTot = ram.sublabel.replace(/\s*GB/i, "")
         tiltText(ctx, plane, W - 216, 59, `${ramUsed} / ${ramTot} GB`, MONO, 10.5, CYAN, 0.95, { align: "r", bold: true, glow: 0.3 })
-        tiltText(ctx, plane, 6, 84, "\uf0e7", ICONF, 10, bcol, 0.95)
-        tiltText(ctx, plane, W, 85, `${Math.round(batteryV * 100)}%`, TITLE, 10, bcol, 0.92, { align: "r", bold: true })
+        const charging = isCharging()
+        tiltText(ctx, plane, 6, 84, "\uf0e7", ICONF, 10, charging ? YELB : bcol, 0.95)
+        if (charging) {
+            const ph = Date.now() / 520
+            for (let i = 0; i < 3; i++) {
+                const t = (ph + i / 3) % 1
+                const yy = 92 - t * 17
+                const a = 0.72 * Math.sin(Math.PI * t)
+                fillQuad(ctx, plane, 3.4, yy, 8.6, yy + 1.7, YELB, a)
+                fillQuad(ctx, plane, 6.2, yy - 2.1, 10.4, yy - 0.6, YELB, a * 0.5)
+            }
+        }
+        if (HAS_BAT) tiltText(ctx, plane, W, 85, `${Math.round(batteryV * 100)}%`, TITLE, 10, charging ? YELB : bcol, 0.92, { align: "r", bold: true })
+        else tiltText(ctx, plane, W, 85, "Power connected", TITLE, 9, bcol, 0.92, { align: "r", bold: true })
 
         if (hovered && mx >= 0) {
             const label = tooltipLabels[hovered]
@@ -294,7 +312,7 @@ export const Monitors = () => {
             if (Math.abs(di) > 0.04) { (d as any)[k] += di * 0.22; busy = true }
             else if (di !== 0) (d as any)[k] = g[k]
         }
-        const sig = `${cpu.percent.get()}|${ram.substat.get()}|${diskUsedG}|${Math.round(batteryV * 100)}|${badgeVal}`
+        const sig = `${cpu.percent.get()}|${ram.substat.get()}|${diskUsedG}|${Math.round(batteryV * 100)}|${badgeVal}|${batStatus}`
         if (sig !== last) { last = sig; changed = true }
         const now = Date.now()
         if (busy || (changed && now - lastDraw > 320)) { lastDraw = now; area.queue_draw() }
@@ -302,7 +320,12 @@ export const Monitors = () => {
         else if (!busy && t) { t.cancel(); t = null }
     }
     cpu.frac.subscribe(pump); ram.frac.subscribe(pump); poke.subscribe(pump)
-    area.connect("destroy", () => { if (t) t.cancel() })
+    let chargeT: any = null
+    const chargePump = interval(1000, () => {
+        if (isCharging()) { if (!chargeT) chargeT = interval(90, () => area.queue_draw()) }
+        else if (chargeT) { chargeT.cancel(); chargeT = null }
+    })
+    area.connect("destroy", () => { if (t) t.cancel(); if (chargeT) chargeT.cancel(); chargePump.cancel() })
     return Box({ className: "monitors", children: [evt] })
 }
 const lighten = (c: RGB, t: number): RGB => [c[0] + (255 - c[0]) * t, c[1] + (255 - c[1]) * t, c[2] + (255 - c[2]) * t] as any
