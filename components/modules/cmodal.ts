@@ -992,7 +992,7 @@ const KEYBINDS = [
     ["I", "BRIGHTNESS"], ["U", "SYSTEM UPGRADE"], ["J", "DISMISS UPDATE"], ["M", "MICROPHONE"], ["O", "MUSIC PLAYER"], ["N", "NETWORKS"],
     ["B", "BLUETOOTH"], ["W", "FORECAST"], ["P", "POWER MENU"], ["Y", "BATTERY"],
     ["C", "CPU / RAM"], ["L", "LOCKSCREEN"], ["R", "SCREEN RECORD"], ["S", "SCREENSHOT"],
-    ["T", "TERMINAL"], ["K", "KILL MODE"], ["-", "TIME / TIMEZONE"],
+    ["T", "TERMINAL"], ["K", "KILL MODE"], ["-", "TIME / TIMEZONE"], ["G", "MARKETS"],
 ]
 const drawKeyCap = (ctx, x, y, label, h) => {
     ctx.selectFontFace(TITLE, 0, 1); ctx.setFontSize(11); const tw = ctx.textExtents(label).width

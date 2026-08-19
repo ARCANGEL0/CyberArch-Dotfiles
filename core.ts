@@ -19,6 +19,7 @@ import Gdk from "gi://Gdk?version=3.0"
 import { COMPONENTS_DIR, CYBER_DIR, SCREEN_WIDTH, SCREEN_HEIGHT } from "./env.ts"
 import { Monitors, setWorkspaceBadge } from "./components/modules/monitors.ts"
 import { SidePanel, openCityModal, openForecastModal } from "./components/modules/sidepanel.ts"
+import { MarketsPanel, openMarketsModal } from "./components/modules/markets.ts"
 import { openTimeModal } from "./components/modules/timeset.ts"
 import { Toggles, HorizDock } from "./components/modules/dock.ts"
 import { OsdWindow } from "./components/modules/osd.ts"
@@ -50,7 +51,7 @@ const compileCss = async () => {
 }
 
 const hudWins = []
-const surface = (mon, name, anchor, child) => {
+const surface = (mon, name, anchor, child, extra = {}) => {
  const w = Window({
  name,
  className: `aug ${name}`,
@@ -59,6 +60,7 @@ const surface = (mon, name, anchor, child) => {
  exclusivity: Exclusivity.IGNORE,
  layer: Layer.BOTTOM,
  child: Box({ className: `aug-wrap ${name}-wrap`, child }),
+ ...extra,
  })
  hudWins.push(w)
  return w
@@ -277,6 +279,9 @@ App.start({
  } else if (request === "clock") {
  try { openTimeModal() } catch (e) { print(e) }
  reply("ok")
+ } else if (request === "markets") {
+ try { openMarketsModal() } catch (e) { print(e) }
+ reply("ok")
  } else if (request === "aur-dismiss") {
  try { dismissAurBar() } catch (e) { print(e) }
  reply("ok")
@@ -294,6 +299,7 @@ App.start({
  for (const mon of (App as any).get_monitors()) {
  surface(mon, "monitors", Anchor.TOP | Anchor.LEFT, Monitors())
  { const sw = surface(mon, "sidepanel", Anchor.TOP | Anchor.RIGHT, SidePanel()); (sw as any)._rectHit = true }
+ { const mw = surface(mon, "markets", Anchor.TOP | Anchor.RIGHT, MarketsPanel(), { margin_top: 560 }); (mw as any)._rectHit = true }
  { const hw = surface(mon, "hordock", Anchor.BOTTOM | Anchor.LEFT, HorizDock()); (hw as any)._rectHit = true }
  { const tw = surface(mon, "toggles", Anchor.BOTTOM | Anchor.LEFT, Toggles()); (tw as any)._rectHit = true }
  { const lw = LauncherWindow(mon); (lw as any)._rectHit = true; hudWins.push(lw) }
