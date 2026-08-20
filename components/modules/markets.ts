@@ -33,27 +33,24 @@ const NEWS_BATCH_QUERIES = [
     ["europe economy technology when:2d", "world business headlines when:2d", "science discoveries when:2d"],
 ]
 const EXTRA_NEWS_FEEDS = [
-    [
-        { feed: "BBC WORLD", url: "https://feeds.bbci.co.uk/news/world/rss.xml", region: "GLOBAL" },
-        { feed: "GUARDIAN WORLD", url: "https://www.theguardian.com/world/rss", region: "GLOBAL" },
-    ],
-    [
-        { feed: "BBC BUSINESS", url: "https://feeds.bbci.co.uk/news/business/rss.xml", region: "GLOBAL" },
-        { feed: "GUARDIAN BUSINESS", url: "https://www.theguardian.com/uk/business/rss", region: "GLOBAL" },
-    ],
-    [
-        { feed: "BBC TECH", url: "https://feeds.bbci.co.uk/news/technology/rss.xml", region: "GLOBAL" },
-        { feed: "GUARDIAN TECH", url: "https://www.theguardian.com/technology/rss", region: "GLOBAL" },
-    ],
-    [
-        { feed: "BBC SCIENCE", url: "https://feeds.bbci.co.uk/news/science_and_environment/rss.xml", region: "GLOBAL" },
-        { feed: "GUARDIAN SCIENCE", url: "https://www.theguardian.com/science/rss", region: "GLOBAL" },
-    ],
-    [
-        { feed: "AL JAZEERA", url: "https://www.aljazeera.com/xml/rss/all.xml", region: "GLOBAL" },
-        { feed: "NPR NEWS", url: "https://feeds.npr.org/1001/rss.xml", region: "GLOBAL" },
-    ],
+    { feed: "BBC WORLD", url: "https://feeds.bbci.co.uk/news/world/rss.xml", region: "GLOBAL" },
+    { feed: "BBC BUSINESS", url: "https://feeds.bbci.co.uk/news/business/rss.xml", region: "GLOBAL" },
+    { feed: "BBC TECH", url: "https://feeds.bbci.co.uk/news/technology/rss.xml", region: "GLOBAL" },
+    { feed: "BBC SCIENCE", url: "https://feeds.bbci.co.uk/news/science_and_environment/rss.xml", region: "GLOBAL" },
+    { feed: "GUARDIAN WORLD", url: "https://www.theguardian.com/world/rss", region: "GLOBAL" },
+    { feed: "GUARDIAN BUSINESS", url: "https://www.theguardian.com/uk/business/rss", region: "GLOBAL" },
+    { feed: "GUARDIAN TECH", url: "https://www.theguardian.com/technology/rss", region: "GLOBAL" },
+    { feed: "GUARDIAN SCIENCE", url: "https://www.theguardian.com/science/rss", region: "GLOBAL" },
+    { feed: "AL JAZEERA", url: "https://www.aljazeera.com/xml/rss/all.xml", region: "GLOBAL" },
+    { feed: "NPR NEWS", url: "https://feeds.npr.org/1001/rss.xml", region: "GLOBAL" },
+    { feed: "SKY NEWS", url: "https://feeds.skynews.com/feeds/rss/world.xml", region: "GLOBAL" },
+    { feed: "DW NEWS", url: "https://rss.dw.com/rdf/rss-en-all", region: "GLOBAL" },
+    { feed: "CNBC", url: "https://www.cnbc.com/id/100003114/device/rss/rss.html", region: "GLOBAL" },
+    { feed: "NYT WORLD", url: "https://rss.nytimes.com/services/xml/rss/nyt/World.xml", region: "GLOBAL" },
+    { feed: "TECHCRUNCH", url: "https://techcrunch.com/feed/", region: "GLOBAL" },
+    { feed: "THE VERGE", url: "https://www.theverge.com/rss/index.xml", region: "GLOBAL" },
 ]
+const EXTRA_FEEDS_PER_PAGE = 4
 const MARKET_PLANE = makePlane({ w: 320, h: 196, yaw: 22, pitch: -8, roll: 4, focal: 4600, dist: 4200, pad: 18 })
 const CRYPTO_SYM: Record<string, string> = {
     bitcoin: "BTC",
@@ -160,6 +157,11 @@ const decodeHtml = (s: string) => String(s || "")
     .replace(/&quot;/g, '"')
     .replace(/&#39;/g, "'")
     .replace(/&apos;/g, "'")
+    .replace(/&nbsp;/gi, " ")
+    .replace(/&rsquo;/gi, "'").replace(/&lsquo;/gi, "'")
+    .replace(/&rdquo;/gi, '"').replace(/&ldquo;/gi, '"')
+    .replace(/&ndash;/gi, "-").replace(/&mdash;/gi, "-")
+    .replace(/&hellip;/gi, "...")
     .replace(/&#x([0-9a-f]+);/gi, (_m, h) => String.fromCharCode(parseInt(h, 16)))
     .replace(/&#([0-9]+);/g, (_m, d) => String.fromCharCode(parseInt(d, 10)))
 
@@ -386,16 +388,21 @@ const drawScrollbar = (ctx: any, x: number, y: number, h: number, total: number,
     ctx.fill()
 }
 
+const isAggregatorFeed = (feed: string) => /^google|^local/i.test(feed)
+
 const parseFeed = (xml: string, feed: string, region: string) => {
     const out: any[] = []
+    const aggregator = isAggregatorFeed(feed)
     const matches = xml.match(/<(item|entry)\b[\s\S]*?<\/\1>/gi) || []
     matches.forEach((item, idx) => {
         const title = first(item, /<title[^>]*>([\s\S]*?)<\/title>/i)
         const link = first(item, /<link[^>]*href="([^"]+)"/i) || first(item, /<link[^>]*>([\s\S]*?)<\/link>/i) || first(item, /<guid[^>]*>([\s\S]*?)<\/guid>/i)
         if (!link || !title) return
-        const summary = first(item, /<description[^>]*>([\s\S]*?)<\/description>/i)
+        const rawSummary = aggregator ? "" : (first(item, /<description[^>]*>([\s\S]*?)<\/description>/i)
             || first(item, /<summary[^>]*>([\s\S]*?)<\/summary>/i)
-            || first(item, /<content:encoded[^>]*>([\s\S]*?)<\/content:encoded>/i)
+            || first(item, /<content:encoded[^>]*>([\s\S]*?)<\/content:encoded>/i))
+        const titleNorm = clean(title).toLowerCase()
+        const summary = clean(rawSummary).toLowerCase().startsWith(titleNorm.slice(0, 24)) ? "" : rawSummary
         const source = first(item, /<source[^>]*>([\s\S]*?)<\/source>/i) || feed
         const published = first(item, /<pubDate[^>]*>([\s\S]*?)<\/pubDate>/i)
             || first(item, /<updated[^>]*>([\s\S]*?)<\/updated>/i)
@@ -436,7 +443,10 @@ const newsFeedsForPage = (city: any, page: number) => {
     const cc = countryCode(city.full || city.name || "")
     const days = Math.min(30, 1 + Math.floor(page / NEWS_BATCH_QUERIES.length))
     const queries = NEWS_BATCH_QUERIES[page % NEWS_BATCH_QUERIES.length] || NEWS_BATCH_QUERIES[0]
-    const extra = EXTRA_NEWS_FEEDS[page % EXTRA_NEWS_FEEDS.length] || []
+    const extraStart = (page * EXTRA_FEEDS_PER_PAGE) % EXTRA_NEWS_FEEDS.length
+    const extra: any[] = []
+    for (let i = 0; i < EXTRA_FEEDS_PER_PAGE; i++)
+        extra.push(EXTRA_NEWS_FEEDS[(extraStart + i) % EXTRA_NEWS_FEEDS.length])
     const cityName = city.name || "LOCAL"
     const cityFull = city.full || cityName
     const localQuery = page % 2 === 0 ? `${cityFull} news when:${Math.max(7, days)}d` : `${cityName} breaking local news when:${Math.max(7, days)}d`
