@@ -1004,7 +1004,7 @@ export const MarketsPanel = () => {
             if (uw > 0.5) fillQuad(ctx, MARKET_PLANE, tx, 19, tx + uw, 20.4, col, on ? 0.9 : 0.5 + hv * 0.4)
             tx += 56
         }
-        fillQuad(ctx, MARKET_PLANE, RX0 - 2, 24, RX1 + 2, 196, [0, 0, 0], 0.44)
+        fillQuad(ctx, MARKET_PLANE, RX0 - 2, 24, RX1 + 2, 196, [0, 0, 0], 0.014)
         fillQuad(ctx, MARKET_PLANE, RX0, 24, RX1, 25, NEON.red, 0.35)
         if (!list.length) {
             tiltText(ctx, MARKET_PLANE, RX0, 48, viewTab === "news" ? "NEWS LOADING..." : "NO PINS - DOUBLE CLICK TO ADD", MONO, 8, NEON.dim, 0.6)
