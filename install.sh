@@ -229,7 +229,7 @@ else
 fi
 
 hdr "QUICKSHELL · login"
-QT6="glibc lib32-glibc qt6-multimedia-ffmpeg qt6-base qt6-declarative qt6-svg qt6-wayland"
+QT6="glibc lib32-glibc qt6-multimedia-ffmpeg qt6-base qt6-declarative qt6-svg qt6-wayland qt5compat"
 sudo pacman -S --needed $QT6 || warn "qt6 install failed |::| run: sudo pacman -S $QT6"
 if ! command -v qs >/dev/null 2>&1 || ! qs --version >/dev/null 2>&1; then
   step "installing quickshell"
@@ -248,10 +248,9 @@ else
   err "qs not executable |::| run: sudo pacman -Syu to update qt6, then re-run."
 fi
 
-hdr "LOCKSCREEN · PAM service"
 PAMFILE="/etc/pam.d/qs-lock"
 if [ -f "$PAMFILE" ]; then
-  ok "$PAMFILE already present"
+  ok "PAM service present ($PAMFILE)"
 else
   step "creating $PAMFILE (auth → system-auth)…"
   if sudo tee "$PAMFILE" >/dev/null <<'PAMEOF'
@@ -263,6 +262,54 @@ PAMEOF
   then ok "lockscreen auth wired (qs-lock → system-auth)"
   else warn "couldn't write $PAMFILE |::| create it manually or the lockscreen will reject every password."
   fi
+fi
+
+QS_LOGIN_OK=1
+if command -v wayland-info >/dev/null 2>&1; then
+  if wayland-info 2>/dev/null | grep -q "ext_session_lock_manager_v1"; then
+    ok "compositor supports ext-session-lock-v1"
+  else
+    warn "ext-session-lock-v1 not found |::| lock screen could show black"
+    QS_LOGIN_OK=0
+  fi
+elif command -v hyprctl >/dev/null 2>&1; then
+  HVER="$(hyprctl version 2>/dev/null | head -1 | grep -oP 'v\K[0-9]+\.[0-9]+')"
+  if [ -n "$HVER" ]; then
+    HMAJ="${HVER%%.*}"; HMIN="${HVER#*.}"
+    if [ "$HMAJ" -gt 0 ] || { [ "$HMAJ" -eq 0 ] && [ "$HMIN" -ge 52 ]; }; then
+      ok "Hyprland $HVER supports ext-session-lock-v1"
+    else
+      warn "Hyprland $HVER < 0.52 |::| ext-session-lock-v1 may not be supported"
+      QS_LOGIN_OK=0
+    fi
+  fi
+else
+  warn "cannot verify ext-session-lock-v1 support |::| ensure your compositor supports it"
+fi
+
+if command -v qs >/dev/null 2>&1 && qs --version >/dev/null 2>&1; then
+  step "smoke testing quickshell login…"
+  QS_LOG=$(mktemp)
+  QS_LOGIN_DIR="$LOGINDST"
+  timeout 4 env QS_TESTING=1 QS_THEME="netwatch" QS_THEME_PATH="$QS_LOGIN_DIR/themes/netwatch" XDG_SESSION_TYPE="${XDG_SESSION_TYPE:-wayland}" QT_MEDIA_BACKEND=ffmpeg qs -p "$QS_LOGIN_DIR/lock_shell.qml" >"$QS_LOG" 2>&1 &
+  QS_PID=$!
+  sleep 3
+  kill "$QS_PID" 2>/dev/null; wait "$QS_PID" 2>/dev/null
+  QS_ERRORS=$(grep -iE "error|cannot|missing|not found|module.*not" "$QS_LOG" 2>/dev/null || true)
+  rm -f "$QS_LOG"
+  if [ -n "$QS_ERRORS" ]; then
+    QS_LOGIN_OK=0
+    err "quickshell login failed smoke test"
+    printf "%s\n" "$QS_ERRORS" | head -5 | while IFS= read -r ln; do printf "  ${RED}✗${R} %s\n" "$ln"; done
+  else
+    ok "quickshell login verified"
+  fi
+fi
+
+if [ "$QS_LOGIN_OK" -eq 0 ]; then
+  err "login screen may not work |::| check the errors above"
+else
+  ok "login screen ready"
 fi
 
 hdr "COOL-RETRO-TERM · netrunner profile"
