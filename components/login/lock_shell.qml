@@ -1,9 +1,8 @@
 import QtQuick
 import Quickshell
 import Quickshell.Wayland
+import Quickshell.Services.Pam
 import QtMultimedia
-import "./shim"
-
 
 ShellRoot {
     id: shellRoot
@@ -11,36 +10,49 @@ ShellRoot {
     property string activeTheme: Quickshell.env("QS_THEME") || "netwatch"
     property string themePath: Quickshell.env("QS_THEME_PATH") || (Quickshell.shellDir + "/themes/" + activeTheme)
 
-    readonly property var sddm: sddmShim.sddm
-    readonly property var config: sddmShim.config
-    readonly property var userModel: sddmShim.userModel
-    readonly property var sessionModel: sddmShim.sessionModel
+    readonly property string currentUser: Quickshell.env("USER") || "V"
     readonly property bool isWayland: Quickshell.env("XDG_SESSION_TYPE") === "wayland"
     property bool authenticated: false
     property bool sessionLocked: true
     property bool isTesting: Quickshell.env("QS_TESTING") === "1"
 
-    SddmShim {
-        id: sddmShim
-        themePath: shellRoot.themePath
+    signal loginOK()
+    signal loginFail()
+
+    function doAuth(user, pass) {
+        pam.user = user || currentUser
+        pam.pendingPassword = pass
+        pam.start()
     }
 
-    Connections {
-        target: sddmShim.sddm
-        function onLoginSucceeded() {
-            shellRoot.authenticated = true
+    PamContext {
+        id: pam
+        property string pendingPassword: ""
 
-            if (Quickshell.env("XDG_CURRENT_DESKTOP") === "Hyprland" || Quickshell.env("HYPRLAND_INSTANCE_SIGNATURE") !== "") {
-                Quickshell.execDetached(["hyprctl", "keyword", "misc:allow_session_lock_restore", "1"]);
+        onResponseRequiredChanged: {
+            if (responseRequired && pendingPassword !== "") {
+                respond(pendingPassword)
+                pendingPassword = ""
             }
-            Quickshell.execDetached(["loginctl", "unlock-session"]);
+        }
 
-            let delay = 100;
-            if (activeTheme.includes("clockwork") && sddmShim.config.enableWindup === "true") {
-                delay = 500;
+        onCompleted: (result) => {
+            if (result === PamResult.Success) {
+                shellRoot.authenticated = true
+                shellRoot.loginOK()
+                Quickshell.execDetached(["loginctl", "unlock-session"])
+
+                if (Quickshell.env("XDG_CURRENT_DESKTOP") === "Hyprland" || Quickshell.env("HYPRLAND_INSTANCE_SIGNATURE") !== "") {
+                    Quickshell.execDetached(["hyprctl", "keyword", "misc:allow_session_lock_restore", "1"])
+                }
+
+                let delay = 100
+                if (activeTheme.includes("clockwork")) delay = 500
+                quitTimer.interval = delay
+                quitTimer.start()
+            } else {
+                shellRoot.loginFail()
             }
-            quitTimer.interval = delay;
-            quitTimer.start()
         }
     }
 
@@ -58,7 +70,7 @@ ShellRoot {
         Loader {
             anchors.fill: parent
             source: "file://" + shellRoot.themePath + "/Main.qml"
-            
+
             onLoaded: {
                 item.forceActiveFocus()
             }
@@ -83,7 +95,7 @@ ShellRoot {
 
                         PinchHandler { target: null }
                         WheelHandler { target: null }
-                        
+
                         MouseArea {
                             anchors.fill: parent
                             acceptedButtons: Qt.AllButtons
@@ -115,11 +127,11 @@ ShellRoot {
                     height: isTesting ? 720 : screen.height
                     visible: shellRoot.sessionLocked
                     visibility: isTesting ? Window.Windowed : Window.FullScreen
-                    
+
                     onClosing: (close) => {
                         close.accepted = shellRoot.authenticated || shellRoot.isTesting;
                     }
-                    
+
                     flags: Qt.WindowStaysOnTopHint | Qt.FramelessWindowHint | Qt.MaximizeUsingFullscreenGeometryHint
                     color: "black"
 

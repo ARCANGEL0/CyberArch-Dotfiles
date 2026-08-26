@@ -5,7 +5,6 @@ import QtMultimedia
 import QtGraphicalEffects
 import Quickshell
 import Quickshell.Io
-import SddmComponents 2.0
 
 Rectangle {
     id: root
@@ -14,9 +13,6 @@ Rectangle {
     color: "#0A0A08"
 
     readonly property real s: Screen.height / 1080
-    property bool isQuickshell: typeof sddm === "undefined" || sddm.hostName === undefined
-    property int sessionIndex: (typeof sessionModel !== "undefined" && sessionModel.lastIndex >= 0) ? sessionModel.lastIndex : 0
-    property int userIndex: (typeof userModel !== "undefined" && userModel.lastIndex >= 0) ? userModel.lastIndex : 0
     property real ui: 0
 
     readonly property color cAmber:      "#FF2A3C"
@@ -40,11 +36,6 @@ Rectangle {
     FontLoader { id: fElectrolize; source: "font/Electrolize-Regular.ttf" }
     FontLoader { id: fSarpanch;    source: "font/Sarpanch-ExtraBold.ttf" }
     FontLoader { id: fEnixe;       source: "font/Enixe.ttf" }
-
-    ListView { id: sessionHelper; model: typeof sessionModel !== "undefined" ? sessionModel : null; currentIndex: root.sessionIndex; opacity: 0; width: 100; height: 100; z: -100
-        delegate: Item { property string sName: model.name || "" } }
-    ListView { id: userHelper; model: typeof userModel !== "undefined" ? userModel : null; currentIndex: root.userIndex; opacity: 0; width: 100; height: 100; z: -100
-        delegate: Item { property string uName: model.realName || model.name || ""; property string uLogin: model.name || "" } }
 
     property string hostName: "NC-NET"
     Process { id: hostProc; command: ["sh","-c","hostname"]; running: true
@@ -330,21 +321,24 @@ Rectangle {
     property bool isAuthenticating: false
 
     function doAuth() {
-        if(root.lockInput==="" || root.isAuthenticating) return
-        var u = (userHelper.currentItem && userHelper.currentItem.uLogin) ? userHelper.currentItem.uLogin : (typeof userModel!=="undefined" ? userModel.lastUser : "")
+        if (root.lockInput === "" || root.isAuthenticating) return
         root.isAuthenticating = true
-        if(typeof sddm!=="undefined") sddm.login(u, root.lockInput, root.sessionIndex)
-        else root.lockError = true
+        shellRoot.doAuth(null, root.lockInput)
     }
 
-    Connections { target: typeof sddm!=="undefined" ? sddm : null
-        function onLoginFailed() {
-            root.isAuthenticating = false; root.lockError = true; root.lockInput = ""
-            pwd.forceActiveFocus(); errTimer.restart(); shake.start()
+    Connections {
+        target: shellRoot
+        function onLoginOK() { root.isAuthenticating = false }
+        function onLoginFail() {
+            root.isAuthenticating = false
+            root.lockError = true
+            root.lockInput = ""
+            pwd.forceActiveFocus()
+            errTimer.restart()
+            shake.start()
         }
-        function onLoginSucceeded() { root.isAuthenticating = false }
     }
-    Timer { id: errTimer; interval: 1800; repeat: false; onTriggered: root.lockError=false }
+    Timer { id: errTimer; interval: 1800; repeat: false; onTriggered: root.lockError = false }
 
     NumberAnimation { id: fadeIn; target: panelContainer; property: "opacity"; from: 0; to: 1; duration: 700; easing.type: Easing.InOutQuad }
     NumberAnimation { id: riseIn; target: panelContainer; property: "anchors.verticalCenterOffset"; from: -20 * s; to: 0; duration: 700; easing.type: Easing.OutQuad }
