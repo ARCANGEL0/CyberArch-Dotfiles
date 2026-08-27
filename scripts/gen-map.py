@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
-import os, subprocess, sys, tempfile
-
+import math
+import shutil
+import subprocess
+import sys
+import tempfile
 def run(cmd):
     subprocess.run(cmd, shell=True, check=True)
-
 def main(lat, lon, out):
     z = 16
     nn = 1 << z
@@ -22,30 +24,34 @@ def main(lat, lon, out):
             tiles.append(p)
     grid = f"{d}/grid.png"
     run(f"montage {' '.join(tiles)} -tile 3x3 -geometry +0+0 -background white '{grid}'")
-
-    import numpy as np
     from PIL import Image
-    img = np.array(Image.open(grid).convert("RGB")).astype(np.float32)
-    r, g, b = img[:,:,0], img[:,:,1], img[:,:,2]
-    lum = 0.299*r + 0.587*g + 0.114*b
-    res = np.zeros_like(img)
-    res[:,:,0] = 6; res[:,:,1] = 10; res[:,:,2] = 15
-    water = (b > r + 12) & (b > 110)
-    green = (g > r + 8) & (g > b + 8) & (g > 120) & ~water
-    res[water, 0] = 7; res[water, 1] = 16; res[water, 2] = 22
-    res[green, 0] = 11; res[green, 1] = 23; res[green, 2] = 16
-    road = (lum < 180) & ~water & ~green
-    res[road, 0] = 40; res[road, 1] = 140; res[road, 2] = 160
-    major = (lum < 80) & ~water
-    res[major, 0] = 60; res[major, 1] = 200; res[major, 2] = 215
-    build = (lum > 200) & (lum < 245) & ~water & ~green
-    res[build, 0] = 9; res[build, 1] = 14; res[build, 2] = 21
-    res = np.clip(res, 0, 255).astype(np.uint8)
-    Image.fromarray(res).save(out)
-    run(f"rm -rf '{d}'")
+    img = Image.open(grid).convert("RGB")
+    src = img.load()
+    res = Image.new("RGB", img.size, (6, 10, 15))
+    dst = res.load()
+    for y in range(img.height):
+        for x in range(img.width):
+            r, g, b = src[x, y]
+            lum = 0.299 * r + 0.587 * g + 0.114 * b
+            water = b > r + 12 and b > 110
+            green = g > r + 8 and g > b + 8 and g > 120 and not water
+            road = lum < 180 and not water and not green
+            major = lum < 80 and not water
+            build = lum > 200 and lum < 245 and not water and not green
+            if water:
+                dst[x, y] = (7, 16, 22)
+            elif green:
+                dst[x, y] = (11, 23, 16)
+            elif road:
+                dst[x, y] = (40, 140, 160)
+            if major:
+                dst[x, y] = (60, 200, 215)
+            elif build:
+                dst[x, y] = (9, 14, 21)
+    res.save(out)
+    shutil.rmtree(d, ignore_errors=True)
 
 if __name__ == "__main__":
-    import math
     if len(sys.argv) != 4:
         sys.exit("usage: gen-map.py LAT LON OUT")
     main(float(sys.argv[1]), float(sys.argv[2]), sys.argv[3])

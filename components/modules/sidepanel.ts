@@ -61,7 +61,8 @@ const wxIcon = (desc) => {
 
 
 let geoCity = "NEW YORK", geoCoords = "40.713°N 74.006°W", geoOK = true
-let geoLat = 40.7128, geoLon = -74.006, mapTile = null, mapVer = 0
+let geoLat = 40.7128, geoLon = -74.006, mapTile = null, mapVer = 0, mapRequest = 0
+let mapCachePath = ""
 let wxLat = 40.7128, wxLon = -74.006, wxName = "NEW YORK", wxFull = "NEW YORK"
 let wxTemp = "--°", wxDesc = "—", wxFeels = "--°", wxHum = "--", wxWind = "--"
 let netName = "OFFLINE"
@@ -85,14 +86,24 @@ const refreshNetSpeed = () => {
  _prx = rx; _ptx = tx; _pnt = now
  areas.forEach(a => a?.queue_draw())
 }
-const WMO = { 0: "Clear", 1: "Mainly clear", 2: "Partly cloudy", 3: "Overcast", 45: "Fog", 48: "Fog", 51: "Drizzle", 53: "Drizzle", 55: "Drizzle", 56: "Freezing drizzle", 57: "Freezing drizzle", 61: "Light rain", 63: "Rain", 65: "Heavy rain", 66: "Freezing rain", 67: "Freezing rain", 71: "Light snow", 73: "Snow", 75: "Heavy snow", 77: "Snow grains", 80: "Showers", 81: "Showers", 82: "Heavy showers", 85: "Snow showers", 86: "Snow showers", 95: "Thunderstorm", 96: "Thunderstorm", 99: "Thunderstorm" }
+const WMO = { 0: "Clear", 1: "Mainly clear", 2: "Partly cloudy", 3: "Overcast", 45: "Fog", 48: "Fog", 51: "Drizzle", 53: "Drizzle", 55: "Drizzle", 56: "Freezing drizzle", 57: "Freezing drizzle", 61: "Light rain", 63: "Rain", 65: "Heavy rain", 66: "Freezing rain", 67: "Freezing rain", 71: "Light snow", 73: "Snow", 75: "Heavy snow", 77: "Snow grains", 80: "Rain", 81: "Rain", 82: "Heavy rain", 85: "Snow", 86: "Heavy snow", 95: "Thunderstorm", 96: "Thunderstorm", 99: "Thunderstorm" }
 const forecast: { day: string; hi: string; lo: string; code: number; pop: number; hiN: number; loN: number; wind: number; uv: number; sunrise: string; sunset: string; date: string }[] = []
 let areas: any[] = []
 
 
 const ro = () => (Math.random() - 0.5) * 0.055
+const mapCacheDir = `${GLib.getenv("XDG_CACHE_HOME") || `${GLib.getenv("HOME") || "/tmp"}/.cache`}/cyberpunk-maps`
+const mapCacheForPoint = () => `${mapCacheDir}/map-${geoLat.toFixed(5)}-${geoLon.toFixed(5)}.png`
+const loadMapCache = (path) => {
+ try {
+  const t = Cairo.ImageSurface.createFromPNG(path)
+  if (t) { mapTile = t; mapVer++; return true }
+ } catch {}
+ return false
+}
 const setMapPoint = (rerandom) => {
  if (rerandom) { geoLat = wxLat + ro(); geoLon = wxLon + ro() }
+ if (!mapCachePath) mapCachePath = mapCacheForPoint()
  geoCoords = `${Math.abs(geoLat).toFixed(3)}°${geoLat >= 0 ? "N" : "S"} ${Math.abs(geoLon).toFixed(3)}°${geoLon >= 0 ? "E" : "W"}`
  geoCity = wxFull; geoOK = true
  areas.forEach(a => a?.queue_draw()); fetchMap()
@@ -101,7 +112,9 @@ const setMapPoint = (rerandom) => {
 
 const WX_STORE = `${CYBER_DIR}/config/city.json`
 const saveWxLocation = () => {
- try { GLib.file_set_contents(WX_STORE, new TextEncoder().encode(JSON.stringify({ name: wxName, full: wxFull, lat: wxLat, lon: wxLon, mapLat: geoLat, mapLon: geoLon }))) } catch (e) { print("[cyber] wx save:", e) }
+ try {
+  GLib.file_set_contents(WX_STORE, new TextEncoder().encode(JSON.stringify({ name: wxName, full: wxFull, lat: wxLat, lon: wxLon, mapLat: geoLat, mapLon: geoLon, mapCache: mapCachePath }, null, 2) + "\n"))
+ } catch (e) { print("[cyber] wx save:", e) }
 }
 const loadWxLocation = () => {
  try {
@@ -110,8 +123,15 @@ const loadWxLocation = () => {
  const o = JSON.parse(new TextDecoder().decode(data))
  if (typeof o.lat === "number" && typeof o.lon === "number") {
  wxLat = o.lat; wxLon = o.lon; wxName = String(o.name || wxName); wxFull = String(o.full || o.name || wxName)
- if (typeof o.mapLat === "number" && typeof o.mapLon === "number") { geoLat = o.mapLat; geoLon = o.mapLon; setMapPoint(false) }
- else setMapPoint(true)
+ if (typeof o.mapLat === "number" && typeof o.mapLon === "number") {
+  geoLat = o.mapLat; geoLon = o.mapLon
+  mapCachePath = typeof o.mapCache === "string" ? o.mapCache : mapCacheForPoint()
+  loadMapCache(mapCachePath)
+  setMapPoint(false)
+ } else {
+  mapCachePath = ""
+  setMapPoint(true)
+ }
  return
  }
  }
@@ -126,12 +146,25 @@ const loadWxLocation = () => {
 // but a random place from the city provided.
 const fetchMap = () => {
  const out = "/tmp/cyber-map.png"
- execAsync(["sh", "-c", `python3 '${CYBER_DIR}/scripts/gen-map.py' ${geoLat} ${geoLon} '${out}'`])
-     .then(async () => {
-     const t = Cairo.ImageSurface.createFromPNG(out)
-     if (t) { mapTile = t; mapVer++; areas.forEach(a => a?.queue_draw()) }
+ const request = ++mapRequest
+ const lat = geoLat, lon = geoLon
+ execAsync(["python3", `${CYBER_DIR}/scripts/gen-map.py`, String(lat), String(lon), out])
+     .then(() => {
+	// fix for changing tiles when city.json is updated
+	// also caches that images on system for next boots, instead falling back to default image
+     if (request !== mapRequest) return
+     try {
+      GLib.mkdir_with_parents(mapCacheDir, 0o755)
+      const [ok, data] = GLib.file_get_contents(out)
+      if (ok && mapCachePath) GLib.file_set_contents(mapCachePath, data)
+     } catch (e) { print("[cyber] map cache:", e) }
+     const t = Cairo.ImageSurface.createFromPNG(mapCachePath || out)
+     if (t) { mapTile = t; mapVer++; saveWxLocation(); areas.forEach(a => a?.queue_draw()) }
      })
-     .catch(() => { try { mapTile = Cairo.ImageSurface.createFromPNG(`${CYBER_DIR}/assets/img/map-grid.png`); if (mapTile) mapVer++; areas.forEach(a => a?.queue_draw()) } catch {} })
+     .catch(() => {
+     if (request !== mapRequest) return
+     try { mapTile = Cairo.ImageSurface.createFromPNG(`${CYBER_DIR}/assets/img/map-grid.png`); if (mapTile) mapVer++; areas.forEach(a => a?.queue_draw()) } catch {}
+     })
 }
 const refreshWeather = async () => {
  try {
@@ -206,8 +239,8 @@ const drawMapStatic = (ctx) => {
 }
 
 
-const drawCompassScan = (ctx, tick) => {
- const px = 150 + Math.sin(tick / 30) * 3, py = 216 + Math.cos(tick / 36) * 2
+const drawCompassScan = (ctx) => {
+ const px = 150, py = 216
  const legs = [[px - 6, py + 6], [px, py - 7], [px + 6, py + 6]]
  const bar = [[px - 3.3, py], [px, py + 3.5], [px + 3.3, py]]
  strokePath(ctx, minimap, legs, NEON.cyan, 0.3, 3.5)
@@ -269,8 +302,7 @@ export const SidePanel = () => {
  refreshNet(); interval(15_000, refreshNet)
  refreshNetSpeed(); interval(1000, refreshNetSpeed)
  const area = DrawingArea({}); areas.push(area); area.set_size_request(plane.width, plane.height)
- try { mapTile = Cairo.ImageSurface.createFromPNG(`${CYBER_DIR}/assets/img/map-grid.png`); mapVer++ } catch {}
- let tick = 0
+ if (!mapTile) try { mapTile = Cairo.ImageSurface.createFromPNG(`${CYBER_DIR}/assets/img/map-grid.png`); mapVer++ } catch {}
  area.connect("draw", (_w, ctx) => {
  const now = new Date()
 
@@ -282,13 +314,10 @@ export const SidePanel = () => {
  drawMapStatic(cx); drawOverlay(cx, now)
  }
  ctx.setSourceSurface(cache, 0, 0); ctx.paint()
- drawCompassScan(ctx, tick)
+ drawCompassScan(ctx)
  drawNetSpeed(ctx)
  return false
  })
- let lastCk = ""
- const t = interval(120, () => { tick++; const ck = Math.round(Math.sin(tick / 30) * 3) + "," + Math.round(Math.cos(tick / 36) * 2); if (ck !== lastCk) { lastCk = ck; area.queue_draw() } })
- area.connect("destroy", () => t.cancel())
 
 
  const evt = EventBox({ child: Box({ className: "side-panel", children: [area] }) })
@@ -327,7 +356,7 @@ const wxRunSearch = async () => {
  wxScroll = 0; wxModal?.requestDraw()
 }
 const wxQueueSearch = () => { if (wxSearchTimer !== null) GLib.source_remove(wxSearchTimer); wxSearchTimer = GLib.timeout_add(GLib.PRIORITY_DEFAULT, 340, () => { wxSearchTimer = null; wxRunSearch().catch(print); return false }) }
-const wxPick = (r) => { wxLat = r.lat; wxLon = r.lon; wxName = String(r.name || "").toUpperCase(); wxFull = r.full.toUpperCase(); setMapPoint(true); saveWxLocation(); refreshWeather(); wxModal.close() }
+const wxPick = (r) => { wxLat = r.lat; wxLon = r.lon; wxName = String(r.name || "").toUpperCase(); wxFull = r.full.toUpperCase(); mapCachePath = ""; setMapPoint(true); saveWxLocation(); refreshWeather(); wxModal.close() }
 
 const ensureWxModal = () => {
  if (wxModal) return

@@ -1,1 +1,9 @@
-{"name":"LONDON","full":"LONDON, ENGLAND, UNITED KINGDOM","lat":51.50853,"lon":-0.12574,"mapLat":51.503292658838795,"mapLon":-0.15190537793094377}
+{
+  "name": "EDOGAWA",
+  "full": "EDOGAWA, TOKYO, JAPAN",
+  "lat": 35.73557,
+  "lon": 139.83566,
+  "mapLat": 35.73557,
+  "mapLon": 139.83566,
+  "mapCache": ""
+}
