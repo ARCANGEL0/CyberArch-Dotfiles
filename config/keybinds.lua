@@ -1,6 +1,17 @@
 local cyberpunk = os.getenv("HOME") .. "/.config/hypr/themes/cyberpunk"
 local themeMod  = "SUPER + SHIFT"
 local augSock   = os.getenv("XDG_RUNTIME_DIR") .. "/astal/cyberpunk.sock"
+
+-- Startup helper used by the prewarm command below.  This must be local to
+-- this file: theme.lua's helper has local scope and is not visible to dofile.
+--- all your custom binds will be here
+
+local once = function(cmd)
+    hl.on("hyprland.start", function()
+        hl.exec_cmd(cmd)
+    end)
+end
+
 -- /////////////////////////////
 -- CONNECT TO SOKCET
 local function sock(msg)
@@ -52,7 +63,7 @@ hl.bind("SUPER + D",  app("scripts/peek"))
 hl.bind(themeMod .. " + R", app("scripts/screenrecord"))
 hl.bind(themeMod .. " + T", app("scripts/terminal"))
 hl.bind(themeMod .. " + S",  app("scripts/screenshot"))
-once(app("scripts/overkill prewarm")) -- Force kill app 
+once(cyberpunk .. "/scripts/overkill prewarm") -- Force kill app
 hl.bind(themeMod .. " + K", app("scripts/overkill"))
 hl.define_submap("kill", function()
     hl.bind("mouse:272", app("scripts/overkill kill"))
@@ -100,4 +111,3 @@ for i = 1, 10 do
      hl.bind("ALT + SHIFT + " .. key, app("scripts/ws move " .. i))
       hl.bind("SUPER + " .. key,       app("scripts/ws go " .. i))
 end
-
