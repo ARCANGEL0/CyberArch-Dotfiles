@@ -19,12 +19,14 @@ EOF
   printf "${R}${CYAN}   ░▒▓ NIGHT CITY RICE · Installer ▓▒░${R}\nMade by: @arcxlo\n"
   line
 }
+MESA_PKGS="mesa mesa-utils libdrm lib32-libdrm lib32-mesa"
+HYP_PKGS="hyprland hyprgraphics hyprland-guiutils hyprlock hyprtoolkit hyprwire xdg-desktop-portal-hyprland lua lua54 gcc gcc-libs hyprlang ffmpeg ffmpeg4.4 chromaprint"
 REPO=(
   gjs grim wf-recorder wl-clipboard networkmanager bluez-utils curl
   wireplumber playerctl brightnessctl power-profiles-daemon upower
   hypridle socat jq rofi libnotify sassc kitty kvantum kvantum-qt5 wget fuse2 sqlite3 pacman-contrib awww
   base-devel pkgconf cmake cpio gcc lib32-libelf lib32-glibc glibc
-  python python-pillow imagemagick mesa mesa-utils
+  python python-pillow imagemagick $MESA_PKGS
   pipewire pipewire-audio pipewire-pulse libpulse mpv ffmpeg sox
   ttf-jetbrains-mono ttf-firacode-nerd ttf-nerd-fonts-symbols
   lib32-gnutls dnsmasq pipewire-alsa ffmpeg4.4 gst-plugin-pipewire lib32-nettle
@@ -35,7 +37,6 @@ AUR=(
   libastal-gjs-git libastal-notifd-git libastal-wireplumber-git libastal-mpris-git
   pamtester
 )
-HYP_PKGS="hyprland hyprgraphics hyprland-guiutils hyprlock hyprtoolkit hyprwire xdg-desktop-portal-hyprland lua lua54 gcc gcc-libs hyprlang ffmpeg ffmpeg4.4 chromaprint"
 
 clear; banner
 
@@ -222,8 +223,14 @@ command -v quickshell >/dev/null || warn "quickshell binary missing |::| session
 hdr "SDDM · display manager"
 if ! command -v sddm >/dev/null 2>&1 && ! pgrep -x sddm >/dev/null 2>&1; then
   step "installing sddm…"
-  sudo pacman -S --needed sddm || warn "sddm install failed |::| run: sudo pacman -S sddm"
+  if ! sudo pacman -S --needed sddm; then
+    echo "Error: SDDM installation failed. Exiting script." >&2
+    echo "Could not install SDDM. Please run manually:" >&2
+    echo "  sudo pacman -S --needed sddm" >&2
+    exit 1
+  fi
 fi
+
 if command -v sddm >/dev/null 2>&1; then
   ok "sddm installed"
   SDDM_CONF="/etc/sddm.conf"
@@ -1082,6 +1089,9 @@ if [ "$ans" = "y" ] || [ "$ans" = "Y" ]; then
 else
   warn "skipped custom Hyprbars plugin |::| run scripts/build-hyprbars later if you want it."
 fi
+hdr "MESA PACKAGES INSTALLATION"
+step "installing/refreshing $MESA_PKGS before restart…"
+sudo pacman -S --needed $MESA_PKGS
 
 clear
 printf "${RED}${B}"
@@ -1118,6 +1128,7 @@ else
   printf "${GRN}${B}  Cyberpunk Hyprland Installation is complete${R} ${GREY}|::| Welcome to Night City, choom.${R}\n"
   printf "${GREY}  Log out and back in so the theme config and autostart entries load cleanly.${R}\n"
 fi
+
 if dm_active; then
   printf "[!] Restart Hyprland now? (y/N) "
   read -r ans </dev/tty
@@ -1128,6 +1139,7 @@ else
 fi
 if [ "$ans" = "y" ] || [ "$ans" = "Y" ]; then
   printf "${CYAN}  ▸ restarting Hyprland…${R}\n"
+  sudo pkill sddm
   pkill -x Hyprland 2>/dev/null || hyprctl dispatch exit >/dev/null 2>&1
 else
   printf "${GREY}  Restart Hyprland yourself when ready (log out / back in, or: ${B}pkill Hyprland${R}${GREY}).${R}\n"
