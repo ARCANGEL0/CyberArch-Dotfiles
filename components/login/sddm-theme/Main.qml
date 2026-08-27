@@ -55,7 +55,7 @@ Rectangle {
     Component.onCompleted: {
         try {
             var xhr = new XMLHttpRequest()
-            xhr.open("GET", Qt.resolvedUrl("city.json"), false)
+            xhr.open("GET", "file://" + Sddm.homeDir + "/.config/hypr/themes/cyberpunk/config/city.json", false)
             xhr.send()
             if (xhr.status === 200 || xhr.status === 0) {
                 var o = JSON.parse(xhr.responseText)

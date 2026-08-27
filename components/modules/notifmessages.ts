@@ -1,6 +1,6 @@
 
-import { Window, Box, DrawingArea, EventBox } from "../../widget.ts"
-import { Anchor, Layer, Exclusivity } from "../../widget.ts"
+import { Window, Box, DrawingArea, EventBox } from "./widget.ts"
+import { Anchor, Layer, Exclusivity } from "./widget.ts"
 import { interval, timeout, execAsync } from "astal"
 import AstalNotifd from "gi://AstalNotifd"
 import Gdk from "gi://Gdk?version=3.0"

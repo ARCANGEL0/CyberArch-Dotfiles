@@ -9,8 +9,8 @@
 
 
 
-import { App, Window, Box } from "./widget.ts"
-import { Anchor, Layer, Exclusivity } from "./widget.ts"
+import { App, Window, Box } from "./components/modules/widget.ts"
+import { Anchor, Layer, Exclusivity } from "./components/modules/widget.ts"
 import { execAsync, timeout, interval } from "astal"
 import AstalNotifd from "gi://AstalNotifd"
 import Gio from "gi://Gio"

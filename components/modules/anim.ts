@@ -1,5 +1,5 @@
-import { App, Window, Box, DrawingArea, activeMonitor, monitorAtPoint } from "../../widget.ts"
-import { Anchor, Layer, Exclusivity } from "../../widget.ts"
+import { App, Window, Box, DrawingArea, activeMonitor, monitorAtPoint } from "./widget.ts"
+import { Anchor, Layer, Exclusivity } from "./widget.ts"
 import { interval, timeout, execAsync } from "astal"
 import { SCREEN_WIDTH, SCREEN_HEIGHT, CYBER_DIR } from "../../env.ts"
 import { NEON, f, RGB } from "./colors.ts"

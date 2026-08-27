@@ -2,7 +2,7 @@
 
 
 
-import { Box, DrawingArea, EventBox, Keymode } from "../../widget.ts"
+import { Box, DrawingArea, EventBox, Keymode } from "./widget.ts"
 import Gdk from "gi://Gdk?version=3.0"
 import GLib from "gi://GLib"
 import { interval, execAsync } from "astal"
@@ -99,7 +99,7 @@ const setMapPoint = (rerandom) => {
 }
 
 
-const WX_STORE = `${CYBER_DIR}/city.json`
+const WX_STORE = `${CYBER_DIR}/config/city.json`
 const saveWxLocation = () => {
  try { GLib.file_set_contents(WX_STORE, new TextEncoder().encode(JSON.stringify({ name: wxName, full: wxFull, lat: wxLat, lon: wxLon, mapLat: geoLat, mapLon: geoLon }))) } catch (e) { print("[cyber] wx save:", e) }
 }

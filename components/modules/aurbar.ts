@@ -1,8 +1,8 @@
 
 
 
-import { Window, DrawingArea } from "../../widget.ts"
-import { Anchor, Layer, Exclusivity } from "../../widget.ts"
+import { Window, DrawingArea } from "./widget.ts"
+import { Anchor, Layer, Exclusivity } from "./widget.ts"
 import { interval, timeout, execAsync } from "astal"
 import { CYBER_DIR } from "../../env.ts"
 import { TITLE, RAJDHANI, RAJDHANI_MED } from "./fonts.ts"

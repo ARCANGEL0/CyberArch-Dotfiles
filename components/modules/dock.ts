@@ -1,4 +1,4 @@
-import { Box, DrawingArea, EventBox } from "../../widget.ts"
+import { Box, DrawingArea, EventBox } from "./widget.ts"
 import Gdk from "gi://Gdk?version=3.0"
 import { interval, timeout, execAsync } from "astal"
 import AstalNotifd from "gi://AstalNotifd"

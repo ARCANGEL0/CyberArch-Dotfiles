@@ -1,8 +1,4 @@
 local cyberpunk = os.getenv("HOME") .. "/.config/hypr/themes/cyberpunk"
-local themeMod  = "SUPER + SHIFT"
-local augSock   = os.getenv("XDG_RUNTIME_DIR") .. "/astal/cyberpunk.sock"
-local TERM      = "rio"
-local TERMFLOAT = "rio"
 
 local once = function(cmd)
     hl.on("hyprland.start", function()
@@ -29,78 +25,7 @@ hl.env("QT_STYLE_OVERRIDE", "kvantum")
 once(cyberpunk .. "/scripts/apply_theme")
 once("mkdir -p " .. os.getenv("HOME") .. "/.config/Kvantum/Daemon && cp -f " .. cyberpunk .. "/assets/gtk/DaemonKvantum/Daemon.kvconfig " .. os.getenv("HOME") .. "/.config/Kvantum/Daemon/Daemon.kvconfig && cp -f " .. cyberpunk .. "/assets/gtk/DaemonKvantum/Daemon.svg " .. os.getenv("HOME") .. "/.config/Kvantum/Daemon/Daemon.svg && echo '[General]' > " .. os.getenv("HOME") .. "/.config/Kvantum/kvantum.kvconfig && echo 'theme=Daemon' >> " .. os.getenv("HOME") .. "/.config/Kvantum/kvantum.kvconfig")
 
-local sock = function(msg)
-    return hl.dsp.exec_cmd('echo "' .. msg .. '" | socat - UNIX-CONNECT:' .. augSock)
-end
-
-hl.bind("SUPER + TAB", hl.dsp.exec_cmd(cyberpunk .. "/scripts/launcher"))
-hl.bind("SUPER + T", hl.dsp.exec_cmd(TERM))
-hl.bind(themeMod .. " + Z", sock("toggle-hud"))
-hl.bind(themeMod .. " + V", sock("modal vol"))
-hl.bind(themeMod .. " + I", sock("modal brt"))
-hl.bind(themeMod .. " + U", sock("modal aur"))
-hl.bind(themeMod .. " + J", sock("aur-dismiss"))
-hl.bind(themeMod .. " + M", sock("notif-hud"))
-hl.bind(themeMod .. " + O", sock("player"))
-hl.bind(themeMod .. " + N", sock("modal wifi"))
-hl.bind(themeMod .. " + B", sock("modal bt"))
-hl.bind(themeMod .. " + P", sock("modal pwr"))
-hl.bind(themeMod .. " + W", sock("forecast"))
-hl.bind(themeMod .. " + minus", sock("clock"))
-hl.bind(themeMod .. " + G", sock("markets"))
-hl.bind(themeMod .. " + Y", sock("modal bat"))
-hl.bind(themeMod .. " + C", sock("modal sys"))
-hl.bind(themeMod .. " + H", sock("modal keys"))
-hl.bind(themeMod .. " + E", sock("notif-read"))
-hl.bind(themeMod .. " + X", sock("notif-dismiss"))
-hl.bind(themeMod .. " + R", hl.dsp.exec_cmd(cyberpunk .. "/scripts/screenrecord"))
-hl.bind(themeMod .. " + T", hl.dsp.exec_cmd(cyberpunk .. "/scripts/terminal"))
-hl.bind(themeMod .. " + S", hl.dsp.exec_cmd(cyberpunk .. "/scripts/screenshot"))
-
-once(cyberpunk .. "/scripts/overkill prewarm")
-hl.bind(themeMod .. " + K", hl.dsp.exec_cmd(cyberpunk .. "/scripts/overkill"))
-hl.define_submap("kill", function()
-    hl.bind("mouse:272", hl.dsp.exec_cmd(cyberpunk .. "/scripts/overkill kill"))
-    hl.bind("escape", hl.dsp.exec_cmd(cyberpunk .. "/scripts/overkill exit"))
-end)
-
-hl.bind(themeMod .. " + L", hl.dsp.exec_cmd(cyberpunk .. "/components/login/lock.sh"))
-hl.bind("CTRL + SHIFT + ALT + r", hl.dsp.exec_cmd(cyberpunk .. "/scripts/restart"))
-hl.bind("SUPER + CTRL + Delete", hl.dsp.exec_cmd("hyprctl reload"))
-
-hl.bind("SUPER + SHIFT + F", hl.dsp.window.fullscreen({ mode = "fullscreen" }))
-hl.bind("SUPER + F", hl.dsp.window.float({ action = "toggle" }))
-hl.bind("SUPER + D", hl.dsp.exec_cmd(cyberpunk .. "/scripts/peek"))
-
-hl.bind("SUPER + left",  hl.dsp.focus({ direction = "left" }))
-hl.bind("SUPER + right", hl.dsp.focus({ direction = "right" }))
-hl.bind("SUPER + up",    hl.dsp.focus({ direction = "up" }))
-hl.bind("SUPER + down",  hl.dsp.focus({ direction = "down" }))
-
-hl.bind("SUPER + SHIFT + left",  hl.dsp.window.move({ direction = "left" }))
-hl.bind("SUPER + SHIFT + right", hl.dsp.window.move({ direction = "right" }))
-hl.bind("SUPER + SHIFT + up",    hl.dsp.window.move({ direction = "up" }))
-hl.bind("SUPER + SHIFT + down",  hl.dsp.window.move({ direction = "down" }))
-
-hl.bind("SUPER + mouse:272", hl.dsp.window.drag(), { mouse = true })
-hl.bind("SUPER + mouse:273", hl.dsp.window.resize(), { mouse = true })
-hl.bind("SUPER + Q", hl.dsp.window.close())
-
-hl.bind("CTRL + SHIFT + left",  hl.dsp.window.resize({ x = -40, y = 0, relative = true }))
-hl.bind("CTRL + SHIFT + right", hl.dsp.window.resize({ x = 40,  y = 0, relative = true }))
-hl.bind("CTRL + SHIFT + up",    hl.dsp.window.resize({ x = 0,   y = -40, relative = true }))
-hl.bind("CTRL + SHIFT + down",  hl.dsp.window.resize({ x = 0,   y = 40, relative = true }))
-
-hl.bind("SUPER + CTRL + left",  hl.dsp.window.resize({ x = -40, y = 0, relative = true }))
-hl.bind("SUPER + CTRL + right", hl.dsp.window.resize({ x = 40,  y = 0, relative = true }))
-hl.bind("SUPER + CTRL + up",    hl.dsp.window.resize({ x = 0,   y = -40, relative = true }))
-hl.bind("SUPER + CTRL + down",  hl.dsp.window.resize({ x = 0,   y = 40, relative = true }))
-
-for i = 1, 10 do
-    local key = i % 10
-    hl.bind("ALT + SHIFT + " .. key, hl.dsp.exec_cmd(cyberpunk .. "/scripts/ws move " .. i))
-    hl.bind("SUPER + " .. key,       hl.dsp.exec_cmd(cyberpunk .. "/scripts/ws go " .. i))
-end
+dofile(cyberpunk .. "/config/keybinds.lua")
 
 hl.config({
     general = {

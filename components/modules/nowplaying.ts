@@ -1,5 +1,5 @@
-import { Window, Box, DrawingArea, App } from "../../widget.ts"
-import { Anchor, Layer, Exclusivity } from "../../widget.ts"
+import { Window, Box, DrawingArea, App } from "./widget.ts"
+import { Anchor, Layer, Exclusivity } from "./widget.ts"
 import { interval } from "astal"
 import AstalMpris from "gi://AstalMpris"
 import { NEON, f } from "./colors.ts"

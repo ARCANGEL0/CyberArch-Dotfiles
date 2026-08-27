@@ -1,5 +1,5 @@
-import { Window, DrawingArea } from "../../widget.ts"
-import { Anchor, Layer, Exclusivity } from "../../widget.ts"
+import { Window, DrawingArea } from "./widget.ts"
+import { Anchor, Layer, Exclusivity } from "./widget.ts"
 import { interval } from "astal"
 import Gdk from "gi://Gdk?version=3.0"
 import GdkPixbuf from "gi://GdkPixbuf"

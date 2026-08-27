@@ -1,4 +1,4 @@
-import { Box, DrawingArea, EventBox } from "../../widget.ts"
+import { Box, DrawingArea, EventBox } from "./widget.ts"
 import Gdk from "gi://Gdk?version=3.0"
 import GLib from "gi://GLib"
 import { interval, execAsync } from "astal"
@@ -205,7 +205,7 @@ const sameDay = (a: number, b = Date.now()) => {
 
 const readCity = () => {
     try {
-        const [ok, data] = GLib.file_get_contents(`${CYBER_DIR}/city.json`)
+        const [ok, data] = GLib.file_get_contents(`${CYBER_DIR}/config/city.json`)
         if (ok) {
             const o = JSON.parse(new TextDecoder().decode(data))
             return {

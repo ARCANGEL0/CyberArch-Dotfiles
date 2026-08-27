@@ -7,7 +7,7 @@
 
 
 
-import { Box, DrawingArea, EventBox } from "../../widget.ts"
+import { Box, DrawingArea, EventBox } from "./widget.ts"
 import { interval, Variable } from "astal"
 import { buildStats } from "./sys.ts"
 import { makePlane, fillQuad, tiltText } from "./proj.ts"

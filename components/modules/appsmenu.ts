@@ -1,5 +1,5 @@
-import { Window, DrawingArea, EventBox, activeMonitor } from "../../widget.ts"
-import { Anchor, Layer, Exclusivity, Keymode } from "../../widget.ts"
+import { Window, DrawingArea, EventBox, activeMonitor } from "./widget.ts"
+import { Anchor, Layer, Exclusivity, Keymode } from "./widget.ts"
 import { interval, timeout, execAsync } from "astal"
 import Gdk from "gi://Gdk?version=3.0"
 import Gtk from "gi://Gtk?version=3.0"

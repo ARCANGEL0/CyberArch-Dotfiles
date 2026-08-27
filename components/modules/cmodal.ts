@@ -1,12 +1,12 @@
 
 
-import { Window, DrawingArea, EventBox, activeMonitor } from "../../widget.ts"
-import { Layer, Exclusivity, Keymode } from "../../widget.ts"
+import { Window, DrawingArea, EventBox, activeMonitor } from "./widget.ts"
+import { Layer, Exclusivity, Keymode } from "./widget.ts"
 import { execAsync, interval, timeout } from "astal"
 import Gdk from "gi://Gdk?version=3.0"
 import GLib from "gi://GLib"
 import { CYBER_DIR, SCREEN_WIDTH, SCREEN_HEIGHT } from "../../env.ts"
-import { Anchor } from "../../widget.ts"
+import { Anchor } from "./widget.ts"
 import {
     Cairo, TITLE, MONO, ICONF, ch, RR, RG, RB, CR, CG, CB, CYAN, ACC, HEADER,
     makeModalPlane, drawGlass, txt, pango, pip, projQuad, segParam, warpReveal, setTxtFX,

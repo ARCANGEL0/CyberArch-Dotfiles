@@ -1,5 +1,5 @@
-import { Window, Box, DrawingArea, activeMonitor } from "../../widget.ts"
-import { Anchor, Layer, Exclusivity } from "../../widget.ts"
+import { Window, Box, DrawingArea, activeMonitor } from "./widget.ts"
+import { Anchor, Layer, Exclusivity } from "./widget.ts"
 import { interval, timeout } from "astal"
 import GLib from "gi://GLib"
 import AstalWp from "gi://AstalWp"
