@@ -27,6 +27,10 @@ once("mkdir -p " .. os.getenv("HOME") .. "/.config/Kvantum/Daemon && cp -f " .. 
 dofile(cyberpunk .. "/config/keybinds.lua")
 
 hl.config({
+    misc = {
+        allow_session_lock_restore = true,
+        force_default_wallpaper = 0,
+    },
     general = {
         border_size = 2,
         gaps_in  = 12,

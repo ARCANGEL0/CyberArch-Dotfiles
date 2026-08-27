@@ -2,8 +2,7 @@ import QtQuick
 import QtQuick.Window
 import QtQuick.Shapes
 import QtMultimedia
-import QtGraphicalEffects
-import Sddm
+import Qt5Compat.GraphicalEffects
 
 Rectangle {
     id: root
@@ -36,7 +35,7 @@ Rectangle {
     FontLoader { id: fSarpanch;    source: "font/Sarpanch-ExtraBold.ttf" }
     FontLoader { id: fEnixe;       source: "font/Enixe.ttf" }
 
-    property string hostName: Sddm.hostname.toUpperCase()
+    property string hostName: "NETWATCH"
 
     property string sessionSig: ""
     function genSig() {
@@ -55,7 +54,7 @@ Rectangle {
     Component.onCompleted: {
         try {
             var xhr = new XMLHttpRequest()
-            xhr.open("GET", "file://" + Sddm.homeDir + "/.config/hypr/themes/cyberpunk/config/city.json", false)
+            xhr.open("GET", "file://" + sddm.homeDir + "/.config/hypr/themes/cyberpunk/config/city.json", false)
             xhr.send()
             if (xhr.status === 200 || xhr.status === 0) {
                 var o = JSON.parse(xhr.responseText)
@@ -66,6 +65,9 @@ Rectangle {
             }
         } catch(e) {}
         root.loadNewsCache()
+        root.ui = 1; fadeIn.start(); riseIn.start(); pwd.forceActiveFocus(); focusRetry.restart()
+        root.sessionSig = root.genSig()
+        root.buildTicker(root.tickerLines)
     }
 
     readonly property var tickerLines: [
@@ -137,7 +139,7 @@ Rectangle {
     function doAuth() {
         if (root.lockInput === "" || root.isAuthenticating) return
         root.isAuthenticating = true
-        sddm.login(sddm.lastUser, root.lockInput)
+        sddm.login(userModel.lastUser, root.lockInput, sessionModel.lastIndex)
     }
 
     Connections {
@@ -322,11 +324,6 @@ Rectangle {
         NumberAnimation{target:panelContainer;property:"anchors.horizontalCenterOffset";to:6 * s;duration:50}
         NumberAnimation{target:panelContainer;property:"anchors.horizontalCenterOffset";to:0;duration:45} }
 
-    Component.onCompleted: {
-        root.ui = 1; fadeIn.start(); riseIn.start(); pwd.forceActiveFocus(); focusRetry.restart()
-        root.sessionSig = root.genSig()
-        root.buildTicker(root.tickerLines)
-    }
     Timer { id: focusRetry; interval: 60; repeat: true; property int cnt: 0
         onTriggered: { pwd.forceActiveFocus(); if(++cnt>=6){running=false;cnt=0} } }
 }

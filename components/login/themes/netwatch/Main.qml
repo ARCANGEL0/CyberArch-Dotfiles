@@ -2,7 +2,7 @@ import QtQuick
 import QtQuick.Window
 import QtQuick.Shapes
 import QtMultimedia
-import QtGraphicalEffects
+import Qt5Compat.GraphicalEffects
 import Quickshell
 import Quickshell.Io
 

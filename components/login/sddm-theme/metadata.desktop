@@ -1,14 +1,14 @@
-[Sddm Greeter]
-Name=netwatch
-Description=NETWATCH — Cyberpunk lock screen theme for SDDM
+[SddmGreeterTheme]
+Name=Netwatch
+Description=NETWATCH SDDM LOGIN
+Author=ARCANGEL0
 Copyright=ARCANGEL0
-GreeterThemeDir=.
-Theme=i18n
-Authors=ARCANGEL0
-Screen=0
-Type=Seal
-Wallpaper=
-ConfigFile=theme.conf
-Version=0.1.0
 License=MIT
+Type=sddm-theme
+Version=0.1.0
 Website=https://github.com/ARCANGEL0/CyberArch-Dotfiles
+MainScript=Main.qml
+ConfigFile=theme.conf
+Theme-Id=netwatch
+Theme-API=2.0
+QtVersion=6

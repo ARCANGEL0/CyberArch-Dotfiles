@@ -42,10 +42,6 @@ ShellRoot {
                 shellRoot.loginOK()
                 Quickshell.execDetached(["loginctl", "unlock-session"])
 
-                if (Quickshell.env("XDG_CURRENT_DESKTOP") === "Hyprland" || Quickshell.env("HYPRLAND_INSTANCE_SIGNATURE") !== "") {
-                    Quickshell.execDetached(["hyprctl", "keyword", "misc:allow_session_lock_restore", "1"])
-                }
-
                 let delay = 100
                 if (activeTheme.includes("clockwork")) delay = 500
                 quitTimer.interval = delay

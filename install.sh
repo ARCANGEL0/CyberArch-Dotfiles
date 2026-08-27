@@ -24,6 +24,7 @@ REPO=(
   wireplumber playerctl brightnessctl power-profiles-daemon upower
   hypridle socat jq rofi libnotify sassc kitty kvantum kvantum-qt5 wget fuse2 sqlite3 pacman-contrib awww
   base-devel pkgconf cmake cpio gcc lib32-libelf lib32-glibc glibc
+  python python-pillow imagemagick mesa mesa-utils
   pipewire pipewire-audio pipewire-pulse libpulse mpv ffmpeg sox
   ttf-jetbrains-mono ttf-firacode-nerd ttf-nerd-fonts-symbols
   lib32-gnutls dnsmasq pipewire-alsa ffmpeg4.4 gst-plugin-pipewire lib32-nettle
@@ -226,25 +227,41 @@ fi
 if command -v sddm >/dev/null 2>&1; then
   ok "sddm installed"
   SDDM_CONF="/etc/sddm.conf"
-  if [ ! -f "$SDDM_CONF" ] || ! grep -q "Theme=" "$SDDM_CONF"; then
-    step "configuring sddm → netwatch theme (wayland greeter)…"
-    if [ -f "$SDDM_CONF" ]; then
-      sudo sed -i '/^\[General\]/a\GreeterEnvironment=wayland\nTheme=netwatch' "$SDDM_CONF" 2>/dev/null
-    else
-      sudo tee "$SDDM_CONF" >/dev/null <<'SDDMCNF'
-[General]
-GreeterEnvironment=wayland
-Theme=netwatch
+  step "configuring sddm → netwatch theme…"
+  if [ ! -f "$SDDM_CONF" ]; then
+    if sudo tee "$SDDM_CONF" >/dev/null <<'SDDMCNF'
+[Theme]
+Current=netwatch
 SDDMCNF
+    then ok "sddm configured → $SDDM_CONF"; else warn "could not write $SDDM_CONF"; fi
+  elif sudo grep -qE '^\[Theme\][[:space:]]*$' "$SDDM_CONF"; then
+    if sudo sed -i '/^\[Theme\][[:space:]]*$/,/^\[/ s/^Current[[:space:]]*=.*/Current=netwatch/' "$SDDM_CONF"; then
+      if sudo awk '
+        /^\[Theme\][[:space:]]*$/ { in_theme=1; next }
+        /^\[/ { in_theme=0 }
+        in_theme && /^Current[[:space:]]*=/ { found=1 }
+        END { exit found ? 0 : 1 }
+      ' "$SDDM_CONF"; then
+        ok "sddm theme set → netwatch"
+      elif sudo sed -i '/^\[Theme\][[:space:]]*$/a Current=netwatch' "$SDDM_CONF"; then
+        ok "sddm theme set → netwatch"
+      else
+        warn "could not set Current=netwatch in $SDDM_CONF"
+      fi
+    else
+      warn "could not update $SDDM_CONF"
     fi
-    ok "sddm configured → $SDDM_CONF"
+  elif printf '\n[Theme]\nCurrent=netwatch\n' | sudo tee -a "$SDDM_CONF" >/dev/null; then
+    ok "sddm theme section appended → netwatch"
   else
-    ok "sddm already configured"
+    warn "could not append a [Theme] section to $SDDM_CONF"
   fi
-  SDDM_THEME_DIR="$HOME/.config/sddm/themes/netwatch"
-  mkdir -p "$SDDM_THEME_DIR"
-  cp -rf "$LOGINSRC/sddm-theme"/* "$SDDM_THEME_DIR"/
-  ok "sddm theme deployed → $SDDM_THEME_DIR"
+  SDDM_THEME_DIR="/usr/share/sddm/themes/netwatch"
+  if sudo install -d -m 755 "$SDDM_THEME_DIR" && sudo cp -rf "$LOGINSRC/sddm-theme"/. "$SDDM_THEME_DIR"/; then
+    ok "sddm theme deployed → $SDDM_THEME_DIR"
+  else
+    warn "could not deploy SDDM theme |::| run: sudo cp -rf '$LOGINSRC/sddm-theme'/.' '$SDDM_THEME_DIR'/"
+  fi
   if ! systemctl is-enabled --quiet sddm 2>/dev/null; then
     step "enabling sddm as default display manager…"
     sudo systemctl enable sddm 2>/dev/null && ok "sddm enabled on boot" || warn "could not enable sddm |::| run: sudo systemctl enable sddm"
@@ -350,8 +367,7 @@ else
 fi
 
 if command -v qs >/dev/null 2>&1 && qs --version >/dev/null 2>&1; then
-  # launching lock_shell.qml grabs a real WlSessionLock and locks the live
-  # screen, so only smoke the QML when NOT inside a running compositor.
+  # fixed issue of hyprlock crashes cus qs lock grabs a WlSessionLocks which crashes hyprland
   if [ -z "${WAYLAND_DISPLAY:-}" ] && [ -z "$DISPLAY" ]; then
     step "smoke testing quickshell login…"
     QS_LOG=$(mktemp)
