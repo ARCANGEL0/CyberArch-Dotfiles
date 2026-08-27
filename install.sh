@@ -788,11 +788,11 @@ kb_key() {
   IFS= read -rsn1 k </dev/tty || { KB_KEY="quit"; return 0; }
   if [ -z "$k" ]; then KB_KEY="enter"; return 0; fi
   if [ "$k" = $'\e' ]; then
-    IFS= read -rsn2 -t 0.06 rest </dev/tty || rest=""
+    IFS= read -rsn2 -t 0.15 rest </dev/tty || rest=""
     case "$rest" in
       "[A") KB_KEY="up" ;;
       "[B") KB_KEY="down" ;;
-      *)    KB_KEY="quit" ;;
+      *)    KB_KEY="none" ;;
     esac
     return 0
   fi
