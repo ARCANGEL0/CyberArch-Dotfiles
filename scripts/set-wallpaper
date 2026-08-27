@@ -1,0 +1,65 @@
+#!/usr/bin/env bash
+
+# FIX FOR THE AWWW ISSUES
+## waits for the wayland socket, then starts awww daemon b4 setting the image
+set -u
+wallpaper="${HOME}/.config/hypr/themes/cyberpunk/assets/img/lucy_wallpaper.png"
+cache_dir="${XDG_CACHE_HOME:-${HOME}/.cache}/awww"
+mkdir -p "$cache_dir"
+
+runtime_dir="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}"
+find_compositor_socket() {
+    if [ -n "${WAYLAND_DISPLAY:-}" ] && [ -S "$runtime_dir/$WAYLAND_DISPLAY" ] && [[ "$WAYLAND_DISPLAY" =~ ^wayland-[0-9]+$ ]]; then
+        return 0
+    fi
+    unset WAYLAND_DISPLAY
+    for socket in "$runtime_dir"/wayland-[0-9]*; do
+        [ -S "$socket" ] || continue
+        candidate="${socket##*/}"
+        [[ "$candidate" =~ ^wayland-[0-9]+$ ]] || continue
+        if WAYLAND_DISPLAY="$candidate" wlr-randr >/dev/null 2>&1; then
+            export WAYLAND_DISPLAY="$candidate"
+            return 0
+        fi
+    done
+    return 1
+}
+
+compositor_ready=0
+if command -v wlr-randr >/dev/null 2>&1; then
+    for _ in $(seq 1 200); do
+        if find_compositor_socket && wlr-randr >/dev/null 2>&1; then
+            compositor_ready=1
+            break
+        fi
+        sleep 0.05
+    done
+else
+    for _ in $(seq 1 100); do
+        if find_compositor_socket; then
+            compositor_ready=1
+            break
+        fi
+        sleep 0.05
+    done
+fi
+
+if [ "$compositor_ready" -ne 1 ]; then
+    printf '%s\n' 'Wayland compositor did not become ready' >>"${HOME}/.cache/cyberpunk-awww.log"
+    exit 1
+fi
+
+for _ in $(seq 1 80); do
+    if awww query >/dev/null 2>&1; then
+        awww img --transition-type none "$wallpaper" >>"${HOME}/.cache/cyberpunk-awww.log" 2>&1
+        exit $?
+    fi
+
+    if ! pgrep -u "$(id -u)" -x awww-daemon >/dev/null 2>&1; then
+        awww-daemon --no-cache >>"${HOME}/.cache/cyberpunk-awww-daemon.log" 2>&1 &
+    fi
+    sleep 0.05
+done
+
+printf '%s\n' 'awww-daemon did not become ready' >>"${HOME}/.cache/cyberpunk-awww.log"
+exit 1
