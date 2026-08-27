@@ -1,15 +1,16 @@
+Markdown
 <div align="center">
 
 <img src="preview/title.gif">
 
-
-
 <p align="center">
-  <img src="https://img.shields.io/badge/TYPESCRIPT-ff2d3d?style=for-the-badge&logo=typescript&logoColor=white" />
-  <img src="https://img.shields.io/badge/CAIRO_GRAPHICS-ff2d3d?style=for-the-badge" />
-  <img src="https://img.shields.io/badge/AGS_V3.0-ff2d3d?style=for-the-badge" />
+  <img src="https://img.shields.io/badge/AGS 3.0-ff2d3d?style=for-the-badge&logo=gtk&logoColor=white" />
+  <img src="https://img.shields.io/badge/Quickshell-ff2d3d?style=for-the-badge&logo=qt&logoColor=white" />
+  <img src="https://github-view-counter.vercel.app/api?username=cyberarch&label=Views:&style=square&bgColor=ff2d3d&color=ffffff" />
   <img src="https://img.shields.io/badge/HYPRLAND-ff2d3d?style=for-the-badge&logo=hyprland&logoColor=white" />
   <img src="https://img.shields.io/badge/ARCH_LINUX-ff2d3d?style=for-the-badge&logo=arch-linux&logoColor=white" />
+
+  
 </p>
 
 ### **A Hyprland *netrunner* rice with built on AGS v3 / Astal**
@@ -44,7 +45,7 @@ https://github.com/user-attachments/assets/f8affc37-d25d-404c-bd02-df04892cfec8
 
 ## ⌁ Welcome to Night City, Choom. ::
 
-<img src="preview/johnny.gif" align="right" width="30%" style="margin-left: 20px;">
+<img src="https://github.com/user-attachments/assets/29ad19da-6f6f-448d-99d3-b2719943e091" align="right" width="30%" style="margin-left: 20px;">
 
 This is my attempt to recreate Cyberpunk 2077 UI entirely on **Hyprland**, using AGS/Astal to build the HUD similar to the in-game overlay including the widgets, minimaps, and more themed features.
 
@@ -142,7 +143,7 @@ This is my attempt to recreate Cyberpunk 2077 UI entirely on **Hyprland**, using
 
 ## ⌁ Requirements
 
-- **Arch Linux or based distros.**
+- **Arch Linux or AUR based distros.** _(Other distros will be available futurely)_
 - **Hyprland ≥ 0.56**
 - An **AUR helper**: `yay` or `paru` (Always check PKGBUILD btw)
 - A running Hyprland session (so theming + first-run setup can apply)
@@ -164,7 +165,8 @@ The installer will download any required dependencies, install the theme, quicks
 
 ## ⌁ Keybinds
 
-The theme modifier is **`$themeMod = SUPER + SHIFT`** (change it at the top of `theme.lua`). Open the full cheat-sheet with all keybinds anytime with **`SUPER+SHIFT+H`**.
+The theme modifier is **`$themeMod = SUPER + SHIFT`**. You can change it on Theme Settings > Keybinds (or change it at the top of `config/keybinds.lua`). 
+Open the full cheat-sheet with all keybinds anytime with **`SUPER+SHIFT+H`**.
 
 ### HUD & widgets
 
@@ -187,6 +189,7 @@ The theme modifier is **`$themeMod = SUPER + SHIFT`** (change it at the top of `
 | `SUPER + SHIFT + Y` | Battery modal |
 | `SUPER + SHIFT + C` | CPU / RAM / system modal |
 | `SUPER + SHIFT + H` | Keybind help |
+| `SUPER + SHIFT + ESC` | Theme Settings |
 
 ### System & capture
 
@@ -219,16 +222,24 @@ The theme modifier is **`$themeMod = SUPER + SHIFT`** (change it at the top of `
 ```
 cyberpunk/
 ├─ core.ts              # HUD entry point (AGS / astal / GJS)
-├─ theme.lua           # Hyprland full theme
-├─ install.sh          
+├─ env.ts              # Environment and runtime helpers
+├─ theme.lua            # Hyprland full theme
+├─ install.sh
+├─ package.json
+├─ tsconfig.json
+├─ config/
+│  ├─ city.json                 #  Saved location (starts by default in London,UK)
+│  └─ keybinds.ts            # Keybinds for theme
+│
 ├─ components/
-│  ├─ modules/         # The widgets and main components of the theme HD
-│  ├─ login/           # Quickshell login
-│  └─ style/           # cyber.scss and cyber.css
-├─ scripts/            # launcher, screenshot, screenrecord, overkill, ws, terminal, and other used scripts.
-├─ quickshell/         # Login screen using quickshell
-├─ city.json           # Here is your saved location (starts by default in London,UK)
-└─ assets/             # fonts, cursor, icons, kitty, kvantum, hyprbars, and resources
+│  ├─ modules/          # The widgets and main components of the theme HD
+│  ├─ login/            # Quickshell login
+│  ├─ style/            # cyber.scss and cyber.css
+│  └─ glitch.frag
+│
+├─ scripts/             # launcher, screenshot, screenrecord, overkill, ws, terminal, and other used scripts.             
+├─ assets/               # fonts, cursor, icons, kitty, kvantum, hyprbars, and resources
+└─ preview/
 ```
 
 ## TODO List
@@ -237,13 +248,16 @@ cyberpunk/
 - [x] Draw HUD on N different monitors
 - [x] Add same notifications from CP2077 messages and add official audios from game
 - [x] Add "+ Street Cred" animation when installing new apps from pacman 
-  <br><img src="preview/streetcred.jpg" width="20%"/>
+  <br><img src="https://github.com/user-attachments/assets/55e4a3b6-3c01-4f4a-aa29-15e349aa43c0" width="20%"/>
 - [x] Add more notification chips on HUD such as 'AUR Update Available!'.
 - [x] Redraw Music Player to match CP2077 Radioport + Now Playing toast animation.
 - [x] Add the 'KEYSTORE' Terminal and add new features
 - [x] Add Stocks and live news feed on Net Terminal
 - [x] Add custom wallpapers and new login
 - [x] Add the RipperDoc GUI or something similar
+- [x] Login screen; configure SDDM as single default lockscreen with netwatch theme + quickshell for session lock.
+- [ ] Wallpaper picker: Create a themed overlay to switch wallpapers easily using awww and quickshell.
+- [ ] Theme configuration: Create a new modal using $themeMod + ESC to open theme configuration such as add/edit keybinds, animations, and general settings.
 <br>
 suggestions are welcome! :) 
 ---
@@ -273,3 +287,4 @@ suggestions are welcome! :)
 
 
 </div>
+
