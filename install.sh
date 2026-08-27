@@ -195,6 +195,11 @@ fi
 if [ -f "$THEME/assets/img/lucy_lock.mp4" ]; then
   cp -f "$THEME/assets/img/lucy_lock.mp4" "$LOGINDST/themes/netwatch/bg.mp4"
 fi
+if [ -f "$THEME/assets/img/lucy_wallpaper.png" ]; then
+  mkdir -p "$CANON/assets/img"
+  cp -f "$THEME/assets/img/lucy_wallpaper.png" "$CANON/assets/img/lucy_wallpaper.png"
+  ok "wallpaper deployed → $CANON/assets/img/lucy_wallpaper.png"
+fi
 chmod +x "$LOGINDST/lock.sh" 2>/dev/null
 mkdir -p "$HOME/.config/qylock"
 echo "netwatch" > "$HOME/.config/qylock/theme"
