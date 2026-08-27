@@ -282,23 +282,33 @@ else
 fi
 
 hdr "QUICKSHELL · login"
-QT6="glibc lib32-glibc qt6-multimedia-ffmpeg qt6-base qt6-declarative qt6-svg qt6-wayland qt5compat"
+QT6="glibc lib32-glibc qt6-multimedia-ffmpeg qt6-base qt6-declarative qt6-svg qt6-wayland qt6-5compat"
 sudo pacman -S --needed $QT6 || warn "qt6 install failed |::| run: sudo pacman -S $QT6"
-if ! command -v qs >/dev/null 2>&1 || ! qs --version >/dev/null 2>&1; then
+QS_LOGIN_OK=1
+qs_ok() { command -v qs >/dev/null 2>&1 && qs --version >/dev/null 2>&1; }
+if ! qs_ok; then
   step "installing quickshell"
   sudo pacman -S --needed quickshell || warn "quickshell repo install failed."
 fi
-if ! qs --version >/dev/null 2>&1; then
+if ! qs_ok; then
+  step "repo quickshell/vendor qt6 mismatch |::| you must sync qt6 first"
+  ok "Qt6 is having issues for installation! Quickshell will fail with this theme."
+  warn "run: sudo pacman -Syu   then re-run this installer |::| (won't do it for you)"
+fi
+if ! qs_ok; then
   helper="$(command -v paru || command -v yay || true)"
   if [ -n "$helper" ]; then
-    step "repo quickshell qt6 mismatch |::| building quickshell-git against local qt6"
+    step "trying quickshell-git (may fail if qt6 is misaligned)"
     "$helper" -S --needed quickshell-git || warn "quickshell-git build failed."
+  else
+    warn "no AUR helper (paru/yay) |::| cannot build quickshell-git"
   fi
 fi
-if command -v qs >/dev/null 2>&1 && qs --version >/dev/null 2>&1; then
+if qs_ok; then
   ok "quickshell ready ($(qs --version 2>/dev/null | head -1 | cut -d' ' -f1-2))"
 else
-  err "qs not executable |::| run: sudo pacman -Syu to update qt6, then re-run."
+  err "quickshell could NOT be installed |::| run: sudo pacman -Syu && paru -S quickshell-git, then re-run."
+  QS_LOGIN_OK=0
 fi
 
 PAMFILE="/etc/pam.d/qs-lock"
@@ -317,7 +327,6 @@ PAMEOF
   fi
 fi
 
-QS_LOGIN_OK=1
 if command -v wayland-info >/dev/null 2>&1; then
   if wayland-info 2>/dev/null | grep -q "ext_session_lock_manager_v1"; then
     ok "compositor supports ext-session-lock-v1"
@@ -341,21 +350,27 @@ else
 fi
 
 if command -v qs >/dev/null 2>&1 && qs --version >/dev/null 2>&1; then
-  step "smoke testing quickshell login…"
-  QS_LOG=$(mktemp)
-  QS_LOGIN_DIR="$LOGINDST"
-  timeout 4 env QS_TESTING=1 QS_THEME="netwatch" QS_THEME_PATH="$QS_LOGIN_DIR/themes/netwatch" XDG_SESSION_TYPE="${XDG_SESSION_TYPE:-wayland}" QT_MEDIA_BACKEND=ffmpeg qs -p "$QS_LOGIN_DIR/lock_shell.qml" >"$QS_LOG" 2>&1 &
-  QS_PID=$!
-  sleep 3
-  kill "$QS_PID" 2>/dev/null; wait "$QS_PID" 2>/dev/null
-  QS_ERRORS=$(grep -iE "error|cannot|missing|not found|module.*not" "$QS_LOG" 2>/dev/null || true)
-  rm -f "$QS_LOG"
-  if [ -n "$QS_ERRORS" ]; then
-    QS_LOGIN_OK=0
-    err "quickshell login failed smoke test"
-    printf "%s\n" "$QS_ERRORS" | head -5 | while IFS= read -r ln; do printf "  ${RED}✗${R} %s\n" "$ln"; done
+  # launching lock_shell.qml grabs a real WlSessionLock and locks the live
+  # screen, so only smoke the QML when NOT inside a running compositor.
+  if [ -z "${WAYLAND_DISPLAY:-}" ] && [ -z "$DISPLAY" ]; then
+    step "smoke testing quickshell login…"
+    QS_LOG=$(mktemp)
+    QS_LOGIN_DIR="$LOGINDST"
+    timeout 4 env QS_TESTING=1 QS_THEME="netwatch" QS_THEME_PATH="$QS_LOGIN_DIR/themes/netwatch" QT_MEDIA_BACKEND=ffmpeg qs -p "$QS_LOGIN_DIR/lock_shell.qml" >"$QS_LOG" 2>&1 &
+    QS_PID=$!
+    sleep 3
+    kill "$QS_PID" 2>/dev/null; wait "$QS_PID" 2>/dev/null
+    QS_ERRORS=$(grep -iE "error|cannot|missing|not found|module.*not" "$QS_LOG" 2>/dev/null || true)
+    rm -f "$QS_LOG"
+    if [ -n "$QS_ERRORS" ]; then
+      QS_LOGIN_OK=0
+      err "quickshell login failed smoke test"
+      printf "%s\n" "$QS_ERRORS" | head -5 | while IFS= read -r ln; do printf "  ${RED}✗${R} %s\n" "$ln"; done
+    else
+      ok "quickshell login verified"
+    fi
   else
-    ok "quickshell login verified"
+    ok "quickshell present |::| skipping live QML smoke test (inside a running compositor)"
   fi
 fi
 
@@ -726,15 +741,33 @@ cf_comment() {
   local f="$1" n="$2"
   if [[ "$f" == *.lua ]]; then sed -i "${n}s|^|-- |" "$f"; else sed -i "${n}s|^|#|" "$f"; fi
 }
+lua_loadvars() {
+  local f="$1" ln name val
+  [ -f "$f" ] || return 0
+  while IFS= read -r ln; do
+    [[ "$ln" =~ ^[[:space:]]*local[[:space:]]+([A-Za-z_][A-Za-z0-9_]*)[[:space:]]*=[[:space:]]*["'\''"]([^"'\''"]*)["'\''"] ]] || continue
+    val="${BASH_REMATCH[2]}"; val="$(printf '%s' "$val" | sed 's/[[:space:]]*$//')"
+    LVARS["${BASH_REMATCH[1]}"]="$val"
+  done < "$f"
+}
+lua_arg() {
+  local s="$1" name pass
+  for pass in 1 2 3; do for name in "${!LVARS[@]}"; do s="${s//$name/${LVARS[$name]}}"; done; done
+  s="${s//\"/}"; s="${s//\'/}"; s="${s//../ }"
+  s="$(printf '%s' "$s" | tr -s ' ' | sed 's/^ *//;s/ *$//')"
+  printf '%s' "$s"
+}
 lua_scan() {
   local f="$1" n=0 ln c raw
+  declare -A LVARS=()
   [ -f "$f" ] || return 0
+  lua_loadvars "$f"
   while IFS= read -r ln; do
     n=$((n+1))
     [[ "$ln" =~ ^[[:space:]]*-- ]] && continue
-    raw="$(printf '%s\n' "$ln" | sed -n 's/.*hl\.bind([[:space:]]*["'\''"]\([^"'\''"]*\)["'\''"].*/\1/p')"
+    raw="$(printf '%s\n' "$ln" | sed -n 's/.*hl\.bind([[:space:]]*\([^,)]*\).*/\1/p')"
     [ -n "$raw" ] || continue
-    c="$(canon "$raw")"
+    c="$(canon "$(lua_arg "$raw")")"
     THAS "$c" || continue
     cf_add "$f" "$n" "$(printf '%s' "$ln" | sed 's/^[[:space:]]*//')" "$c"
   done < "$f"
