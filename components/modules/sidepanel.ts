@@ -120,20 +120,18 @@ const loadWxLocation = () => {
 }
 
 
-const fetchMap = async () => {
- try {
- const z = 16, nn = 2 ** z
- const xt = Math.floor((geoLon + 180) / 360 * nn)
- const lr = geoLat * Math.PI / 180
- const yt = Math.floor((1 - Math.log(Math.tan(lr) + 1 / Math.cos(lr)) / Math.PI) / 2 * nn)
- const dir = "/tmp/aug-tiles", dl: string[] = []
- for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++)
- dl.push(`curl -sf --retry 3 --retry-delay 1 --retry-all-errors --max-time 15 -A 'cyberpunk-hud/1.0 (linux desktop)' 'https://a.basemaps.cartocdn.com/dark_nolabels/${z}/${xt + dx}/${yt + dy}.png' -o ${dir}/t${dl.length}.png`)
- await execAsync(["sh", "-c", `mkdir -p ${dir} && ${dl.join(" && ")}`])
- await execAsync(["sh", "-c", `magick montage ${dir}/t0.png ${dir}/t1.png ${dir}/t2.png ${dir}/t3.png ${dir}/t4.png ${dir}/t5.png ${dir}/t6.png ${dir}/t7.png ${dir}/t8.png -tile 3x3 -geometry +0+0 -background black ${dir}/grid.png && magick ${dir}/grid.png -modulate 108,42 /tmp/aug-map.png`])
- mapTile = Cairo.ImageSurface.createFromPNG("/tmp/aug-map.png"); mapVer++
- areas.forEach(a => a?.queue_draw())
- } catch (e) { print("[cyber] map:", e) }
+// change of minimap get func, since cartoAPI is hitting ratelimits (i thought it was free),
+// changed to OpenStreetMap. changing the location from city.json triggers rendering a new
+// tilemap of a random location. chill, the theme does not track your geolocation,
+// but a random place from the city provided.
+const fetchMap = () => {
+ const out = "/tmp/cyber-map.png"
+ execAsync(["sh", "-c", `python3 '${CYBER_DIR}/scripts/gen-map.py' ${geoLat} ${geoLon} '${out}'`])
+     .then(async () => {
+     const t = Cairo.ImageSurface.createFromPNG(out)
+     if (t) { mapTile = t; mapVer++; areas.forEach(a => a?.queue_draw()) }
+     })
+     .catch(() => { try { mapTile = Cairo.ImageSurface.createFromPNG(`${CYBER_DIR}/assets/img/map-grid.png`); if (mapTile) mapVer++; areas.forEach(a => a?.queue_draw()) } catch {} })
 }
 const refreshWeather = async () => {
  try {
@@ -271,7 +269,7 @@ export const SidePanel = () => {
  refreshNet(); interval(15_000, refreshNet)
  refreshNetSpeed(); interval(1000, refreshNetSpeed)
  const area = DrawingArea({}); areas.push(area); area.set_size_request(plane.width, plane.height)
- try { mapTile = Cairo.ImageSurface.createFromPNG("/tmp/aug-map.png"); mapVer++ } catch {}
+ try { mapTile = Cairo.ImageSurface.createFromPNG(`${CYBER_DIR}/assets/img/map-grid.png`); mapVer++ } catch {}
  let tick = 0
  area.connect("draw", (_w, ctx) => {
  const now = new Date()
