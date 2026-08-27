@@ -77,6 +77,25 @@ const loadApps = () => {
      appInfoCache = list; return list
  } catch (e) { print("[apps]", e); return [] }
 }
+const launchApp = (app) => {
+    const ctx = Gdk.Display.get_default()?.get_app_launch_context?.() ?? null
+    try {
+        if (app.launch([], ctx)) return true
+    } catch (e) {
+        print("[apps] launch:", e)
+    }
+    try {
+        const cmd = app.get_commandline?.()
+        if (!cmd) return false
+        const fallback = Gio.AppInfo.create_from_commandline(
+            cmd, app.get_name() || "", Gio.AppInfoCreateFlags.SUPPORTS_STARTUP_NOTIFICATION
+        )
+        return fallback.launch([], ctx)
+    } catch (e) {
+        print("[apps] fallback:", e)
+        return false
+    }
+}
 export const buildAppEntries = () => loadApps().map((a) => ({ label: a.get_name() || "", badge: "READY", icon: null, glyph: null, data: a }))
 
 const iconFor = (app) => {
@@ -278,7 +297,7 @@ export const openWheel = (cfg, entries) => {
   apps = entries; query = ""; filtered = apps.slice(); searchFlash = 0; scroll = 0; scrollTarget = 0
   active = true; intro = 1; introTarget = 1; lastFocusIdx = -1
   try { menuWin.gdkmonitor = activeMonitor() } catch {}
-  try { menuWin.keymode = cfg.keymode ?? Keymode.ON_DEMAND } catch {}
+  try { menuWin.keymode = cfg.keymode ?? Keymode.EXCLUSIVE } catch {}
   menuWin.visible = true; try { menuWin.present?.() } catch {}
   menuArea?.queue_draw()
   animate()
@@ -301,7 +320,7 @@ export const closeWheel = () => {
 export const openAppsMenu = () => {
  if (!menuWin) return
  if (active) { closeWheel(); return }
- openWheel({ title: "APPS", subtitle: "// CYBERDECK.OS — RUNNING", footer: FOOTER_APPS, searchable: true, onActivate: (a) => { try { a.launch([], null) } catch (e) { print("[apps] launch:", e) } closeWheel() }, onSecondary: null, onReset: null, emptyText: "// NO APPS" }, buildAppEntries())
+ openWheel({ title: "APPS", subtitle: "// CYBERDECK.OS — RUNNING", footer: FOOTER_APPS, searchable: true, onActivate: (a) => { if (launchApp(a)) closeWheel() }, onSecondary: null, onReset: null, emptyText: "// NO APPS" }, buildAppEntries())
 }
 
 export const AppsMenuWindow = () => {
@@ -316,7 +335,12 @@ export const AppsMenuWindow = () => {
  evt.connect("button-press-event", (_w, e) => {
      if (!active) return true
      let b = 1; try { b = e.get_button?.()[1] ?? e.button } catch {}
-     const r = rowAtY(mouseY)
+     let clickY = mouseY
+     try {
+         const coords = e.get_coords?.()
+         if (coords && coords.length >= 3) clickY = coords[2]
+     } catch {}
+     const r = rowAtY(clickY)
      if (b === 3) { if (r && wheelCfg.onSecondary) wheelCfg.onSecondary(r.entry.data); else closeWheel(); return true }
      if (r) {
          if (typeof r.idxAbs === "number" && r.idxAbs !== Math.round(scroll)) {
@@ -346,7 +370,7 @@ export const AppsMenuWindow = () => {
  menuWin = Window({
      name: "appsmenu", namespace: "modal_appsmenu", className: "aug appsmenu",
      anchor: Anchor.TOP | Anchor.BOTTOM | Anchor.LEFT | Anchor.RIGHT,
-     layer: Layer.TOP, exclusivity: Exclusivity.IGNORE, keymode: Keymode.ON_DEMAND,
+     layer: Layer.TOP, exclusivity: Exclusivity.IGNORE, keymode: Keymode.EXCLUSIVE,
      visible: false, child: evt,
  })
  menuWin.connect("key-press-event", (_w, e) => {
