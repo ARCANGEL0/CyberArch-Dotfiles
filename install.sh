@@ -211,7 +211,55 @@ else
   printf 'general {\n  lock_cmd = %s/lock.sh\n  before_sleep_cmd = loginctl lock-session\n}\n' "$LOGINDST" > "$IDLECONF"
   ok "created $IDLECONF with lock_cmd → $LOGINDST/lock.sh"
 fi
-command -v quickshell >/dev/null || warn "quickshell binary missing |::| login screen will not launch"
+command -v quickshell >/dev/null || warn "quickshell binary missing |::| session lock will not launch"
+
+hdr "SDDM · display manager"
+if ! command -v sddm >/dev/null 2>&1 && ! pgrep -x sddm >/dev/null 2>&1; then
+  step "installing sddm…"
+  sudo pacman -S --needed sddm || warn "sddm install failed |::| run: sudo pacman -S sddm"
+fi
+if command -v sddm >/dev/null 2>&1; then
+  ok "sddm installed"
+  SDDM_CONF="/etc/sddm.conf"
+  if [ ! -f "$SDDM_CONF" ] || ! grep -q "Theme=" "$SDDM_CONF"; then
+    step "configuring sddm → netwatch theme (wayland greeter)…"
+    if [ -f "$SDDM_CONF" ]; then
+      sudo sed -i '/^\[General\]/a\GreeterEnvironment=wayland\nTheme=netwatch' "$SDDM_CONF" 2>/dev/null
+    else
+      sudo tee "$SDDM_CONF" >/dev/null <<'SDDMCNF'
+[General]
+GreeterEnvironment=wayland
+Theme=netwatch
+SDDMCNF
+    fi
+    ok "sddm configured → $SDDM_CONF"
+  else
+    ok "sddm already configured"
+  fi
+  SDDM_THEME_DIR="$HOME/.config/sddm/themes/netwatch"
+  mkdir -p "$SDDM_THEME_DIR"
+  cp -rf "$LOGINSRC/sddm-theme"/* "$SDDM_THEME_DIR"/
+  ok "sddm theme deployed → $SDDM_THEME_DIR"
+  if ! systemctl is-enabled --quiet sddm 2>/dev/null; then
+    step "enabling sddm as default display manager…"
+    sudo systemctl enable sddm 2>/dev/null && ok "sddm enabled on boot" || warn "could not enable sddm |::| run: sudo systemctl enable sddm"
+  else
+    ok "sddm already enabled"
+  fi
+else
+  warn "sddm not found |::| skipping display manager setup"
+fi
+
+step "installing news cache cron for sddm ticker…"
+CACHE_SCRIPT="$LOGINSRC/sddm-theme/cache-news.sh"
+if [ -f "$CACHE_SCRIPT" ]; then
+  chmod +x "$CACHE_SCRIPT"
+  CRON_LINE="*/10 * * * * $CACHE_SCRIPT"
+  (crontab -l 2>/dev/null | grep -v "cache-news.sh"; echo "$CRON_LINE") | crontab - 2>/dev/null
+  ok "news cache cron installed (every 10 min)"
+else
+  warn "cache-news.sh missing |::| skipping cron install"
+fi
 
 hdr "PACMAN HOOK"
 HOOKSRC="$THEME/assets/pacman/cyberpunk-pkg-notify.hook"
