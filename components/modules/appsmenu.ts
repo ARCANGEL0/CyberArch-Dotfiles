@@ -80,19 +80,9 @@ const loadApps = () => {
 const launchApp = (app) => {
     const ctx = Gdk.Display.get_default()?.get_app_launch_context?.() ?? null
     try {
-        if (app.launch([], ctx)) return true
+        return app.launch([], ctx)
     } catch (e) {
         print("[apps] launch:", e)
-    }
-    try {
-        const cmd = app.get_commandline?.()
-        if (!cmd) return false
-        const fallback = Gio.AppInfo.create_from_commandline(
-            cmd, app.get_name() || "", Gio.AppInfoCreateFlags.SUPPORTS_STARTUP_NOTIFICATION
-        )
-        return fallback.launch([], ctx)
-    } catch (e) {
-        print("[apps] fallback:", e)
         return false
     }
 }
