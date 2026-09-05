@@ -233,6 +233,7 @@ CD.actions = {
     { id="hud.brt",      label="BRIGHTNESS",          mod="@themeMod", key="I",         group="deck", run=sock("modal brt") },
     { id="hud.aur",      label="UPDATES",             mod="@themeMod", key="U",         group="deck", run=sock("modal aur") },
     { id="hud.aurdis",   label="DISMISS UPDATES",     mod="@themeMod", key="J",         group="deck", run=sock("aur-dismiss") },
+    { id="hud.update",   label="CYBERARCH UPDATE",    mod="@themeMod", key="Q",         group="deck", run=sock("cyber-update") },
     { id="hud.notif",    label="NOTIFICATIONS",       mod="@themeMod", key="M",         group="deck", run=sock("notif-hud") },
     { id="hud.player",   label="MUSIC PLAYER",        mod="@themeMod", key="O",         group="deck", run=sock("player") },
     { id="hud.wifi",     label="NETWORKS",            mod="@themeMod", key="N",         group="deck", run=sock("modal wifi") },
